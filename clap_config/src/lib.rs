@@ -1,3 +1,6 @@
+use heck::ToKebabCase;
+use heck::ToSnakeCase;
+// use clap::clap_derive::ClapAttr;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -13,10 +16,13 @@ use syn::Field;
 use syn::Fields;
 use syn::GenericArgument;
 use syn::Ident;
+use syn::Meta;
 use syn::PathArguments;
 use syn::PathSegment;
+use syn::Token;
 use syn::Type;
 use syn::TypePath;
+use syn::Variant;
 
 /**
 Generate a config struct and a method to merge the two values together.
@@ -50,39 +56,75 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     // Name of the struct we're creating a Config version of.
-    let input_struct_name = input.ident;
+    let input_ident = input.ident;
     // Name of the config struct we' creating.
-    let config_struct_name = format_ident!("{}Config", input_struct_name);
+    let config_ident = &get_config_ident(&input_ident);
 
-    let input_fields = input_struct_fields(&input.data);
+    let config_fields;
+    let merge_method;
 
-    let config_fields = make_fields_optional(input_fields);
-
-    let merge_method = generate_merge_method(&config_struct_name, input_fields);
+    let data = &input.data;
+    match *data {
+        Data::Struct(ref data) => match data.fields {
+            Fields::Named(ref fields) => {
+                let input_fields = &fields.named;
+                config_fields = make_fields_optional(input_fields);
+                merge_method = struct_merge_method(config_ident, input_fields);
+            }
+            _ => unimplemented!("Unimplemented struct field"),
+        },
+        Data::Enum(ref data) => {
+            let variants = &data.variants;
+            config_fields = variants_to_fields(variants);
+            merge_method = enum_merge_method(config_ident, variants);
+        }
+        _ => unimplemented!("Unimplemented input type"),
+    }
 
     let output = quote!(
-        #[derive(std::default::Default, std::fmt::Debug, serde::Deserialize, serde::Serialize)]
-        pub struct #config_struct_name {
+        #[derive(std::default::Default, std::fmt::Debug, std::clone::Clone, serde::Deserialize, serde::Serialize)]
+        pub struct #config_ident {
             #config_fields
         }
 
-        impl #input_struct_name {
+        impl #input_ident {
             #merge_method
         }
     );
-
     proc_macro::TokenStream::from(output)
 }
 
-/// An iterator over the fields in the input struct.
-fn input_struct_fields(data: &Data) -> &Punctuated<Field, Comma> {
-    match *data {
-        Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => &fields.named,
-            _ => unimplemented!(),
-        },
-        _ => unimplemented!(),
+fn variants_to_fields(variants: &Punctuated<syn::Variant, Comma>) -> TokenStream {
+    let optional_fields = variants.iter().map(|v| {
+        let name = Ident::new(
+            &v.ident.to_string().as_str().to_snake_case(),
+            v.ident.span(),
+        );
+        let f = get_variant_field(v);
+        let ty = make_subcommand_ty(&f.ty);
+        quote_spanned!(f.span()=> #name: std::option::Option<#ty>)
+    });
+
+    quote! {
+        #(#optional_fields),*
     }
+}
+
+fn get_variant_field(v: &Variant) -> &Field {
+    let f = match v.fields {
+        Fields::Named(ref fields) => fields
+            .named
+            .iter()
+            .next()
+            .expect("Expected enum variant to have a single named field"),
+        Fields::Unnamed(ref fields) => fields
+            .unnamed
+            .iter()
+            .next()
+            .expect("Expected enum variant to have a single unnamed field"),
+        _ => unimplemented!("Haven't implemented other types of enum variant"),
+    };
+    f
 }
 
 /// Convert any fields that aren't already `Option<...>` to `Option<...>` fields, ensuring
@@ -91,7 +133,14 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
     let optional_fields = fields.iter().map(|f| {
         let name = &f.ident;
         let ty = &f.ty;
-        if strip_optional_wrapper_if_present(f).is_some() {
+
+        if is_subcommand_field(f).expect("Failed to check if subcommand field is field") {
+            let ty = make_subcommand_ty(strip_optional_wrapper_if_present(f).unwrap_or(&f.ty));
+            quote_spanned!(f.span()=>
+                #[serde(flatten)]
+                #name: std::option::Option<#ty>
+            )
+        } else if strip_optional_wrapper_if_present(f).is_some() {
             quote_spanned!(f.span()=> #name: #ty)
         } else {
             quote_spanned!(f.span()=> #name: std::option::Option<#ty>)
@@ -103,6 +152,26 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
     }
 }
 
+fn make_subcommand_ty(ty: &Type) -> Type {
+    if let Type::Path(path) = ty {
+        let ident = path
+            .path
+            .require_ident()
+            .expect("Expected subcommand type to be bare identifier.");
+        let new_ident = get_config_ident(ident);
+        Type::Path(TypePath {
+            qself: None,
+            path: syn::Path::from(PathSegment::from(new_ident)),
+        })
+    } else {
+        panic!("Expected the subcommand type to be a bare identifier type.");
+    }
+}
+
+fn get_config_ident(ident: &Ident) -> Ident {
+    format_ident!("{ident}Config")
+}
+
 /**
 Generate method that merges our config into the clap-generated struct, with precedence being:
 
@@ -110,10 +179,7 @@ Generate method that merges our config into the clap-generated struct, with prec
 - Things in the config
 - Clap defaults
 */
-fn generate_merge_method(
-    config_struct_name: &Ident,
-    fields: &Punctuated<Field, Comma>,
-) -> TokenStream {
+fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) -> TokenStream {
     let struct_fields = fields.iter().map(|f| {
         let name = &f.ident;
         quote!(#name)
@@ -125,7 +191,23 @@ fn generate_merge_method(
         let span = ty.span();
         let name_str = name.as_ref().map(|name| name.to_string()).expect("Expected field to have a name");
 
-        if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
+        if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
+            if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
+                quote_spanned! {span=>
+                    let #name: #ty = {
+                        if let Some((subcommand_name, subcommand_matches)) = matches.remove_subcommand() {
+                            Some(#stripped_ty :: from_merged(subcommand_name, subcommand_matches, config.#name.clone()))
+                        } else {
+                            None
+                        }
+                    };
+                }
+            } else {
+                quote_spanned! {span=>
+                    let #name: #ty = #ty :: from_merged(subcommand_matches);
+                }
+            }
+        } else if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
             // User-specified field's type was `Option<T>`
             quote_spanned! {span=>
                 let #name: #ty = {
@@ -182,7 +264,7 @@ fn generate_merge_method(
     });
 
     quote! {
-        pub fn from_merged(mut matches: clap::ArgMatches, mut config: #config_struct_name) -> Self {
+        pub fn from_merged(mut matches: clap::ArgMatches, mut config: #config_ident) -> Self {
 
             #(#field_updates)*
 
@@ -193,6 +275,42 @@ fn generate_merge_method(
     }
 }
 
+/**
+Generate subcommand merging method that merges our config into the clap-generated enum, with precedence being:
+
+- Things specified via `--arg` or `$ENV_VAR`
+- Things in the config
+- Clap defaults
+*/
+fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>) -> TokenStream {
+    let match_arms = variants.iter().map(|v| {
+        let name = &v.ident;
+        // TODO(gib): handle non-standard formats.
+        let kebab_case_name = &name.to_string().as_str().to_kebab_case();
+        let snake_case_ident = Ident::new(&name.to_string().as_str().to_snake_case(), name.span());
+        let f = get_variant_field(v);
+        let ty = &f.ty;
+
+        let subcmd_opts_name = &ty;
+
+        quote!{
+            #kebab_case_name => Self::#name(#subcmd_opts_name::from_merged(matches, config.unwrap_or_default().#snake_case_ident.unwrap_or_default())),
+        }
+    });
+
+    quote! {
+        pub fn from_merged(subcommand_name: String, mut matches: clap::ArgMatches, mut config: ::std::option::Option<#config_ident>) -> Self {
+            match subcommand_name.as_str() {
+                #(#match_arms)*
+                _ => unimplemented!("Should have exhaustively checked all possible subcommands."),
+            }
+        }
+    }
+}
+
+// TODO(gib): steal from
+// <https://stackoverflow.com/questions/55271857/how-can-i-get-the-t-from-an-optiont-when-using-syn>
+// ?
 /// If the field type is `Option<Foo>`, return `Some(Foo)`. Else return `None`.
 fn strip_optional_wrapper_if_present(f: &Field) -> Option<&Type> {
     let ty = &f.ty;
@@ -233,4 +351,23 @@ fn strip_vec_wrapper_if_present(f: &Field) -> Option<&Type> {
     }
 
     None
+}
+
+// Returns whether the field has a field attribute `#[clap(subcommand)]`.
+fn is_subcommand_field(f: &Field) -> Result<bool, syn::Error> {
+    let mut is_subcommand = false;
+    'outer: for attr in f.attrs.iter() {
+        if attr.path().is_ident("clap") {
+            for meta in attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)? {
+                if let Meta::Path(path) = meta {
+                    if path.is_ident(&Ident::new("subcommand", path.span())) {
+                        is_subcommand = true;
+                        break 'outer;
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(is_subcommand)
 }

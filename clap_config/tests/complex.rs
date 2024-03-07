@@ -3,18 +3,18 @@ Tests that the macro produces usable output for a complex clap derived struct (t
 include any subcommands).
 */
 
-use clap::ValueEnum;
-use serde::Deserialize;
 use bytesize::ByteSize;
 use clap::ArgAction;
 use clap::CommandFactory;
 use clap::Parser;
-use serde::Serialize;
-use std::str::FromStr;
+use clap::ValueEnum;
 use clap_config::ClapConfig;
 use color_eyre::Result;
 use const_format::formatcp;
 use pretty_assertions::assert_eq;
+use serde::Deserialize;
+use serde::Serialize;
+use std::str::FromStr;
 
 const FLAG_STRING_DEFAULT: &str = "flag-string-default";
 const FLAG_STRING_ARG: &str = "flag-string-arg";
@@ -59,40 +59,27 @@ const POSITIONAL_STRING_ARG: &str = "positional-string-arg";
 const UNSET_ARGS: [&str; 1] = ["myapp"];
 const SET_ARGS: [&str; 22] = [
     "myapp",
-
     "--flag-string",
     FLAG_STRING_ARG,
-
     "--flag-bool-a",
-
     "--flag-bool-b=false",
-
     "--flag-option-string",
     FLAG_OPTION_STRING_ARG,
-
     "--flag-vec-single",
     FLAG_VEC_SINGLE_ARG,
-
     "--flag-vec-multiple",
     FLAG_VEC_MULTIPLE_ARG_A,
-
     "--flag-vec-multiple",
     FLAG_VEC_MULTIPLE_ARG_B,
-
     "--flag-vec-multiple",
     FLAG_VEC_MULTIPLE_ARG_C,
-
     "--flag-bytesize",
     FLAG_BYTESIZE_ARG,
-
     "--flag-enum",
     FLAG_ENUM_ARG,
-
     "--flag-option-enum",
     FLAG_ENUM_ARG,
-
     POSITIONAL_STRING_ARG,
-
 ];
 
 const UNSET_CONFIG: &str = "";
@@ -163,7 +150,6 @@ pub struct Opts {
     positional_string: Option<String>,
 }
 
-/// When to update the Xbs dependency database cache.
 #[derive(Debug, Clone, ValueEnum, Default, Serialize, Deserialize, PartialEq)]
 pub enum FlagEnum {
     #[default]
@@ -171,7 +157,6 @@ pub enum FlagEnum {
     ArgValue,
     ConfigValue,
 }
-
 
 /// Nothing set anywhere.
 #[test]

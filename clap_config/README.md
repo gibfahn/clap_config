@@ -32,9 +32,8 @@ let config: OptsConfig = serde_yaml::from_str(&config_str).unwrap();
 let opts = Opts::from_merged(matches, config);
 ```
 
-## TODO
+## Todos
 
-- Support for setting serde flags like `#[serde(rename_all = "kebab-case",
-deny_unknown_fields)]` on the generated struct.
-- Support for subcommands.
-- Support for setting required arguments in the config file.
+- Set serde flags like `#[serde(rename_all = "kebab-case", deny_unknown_fields)]` on the generated struct.
+- Set required arguments in the config file.
+- Set positional arguments in the config file
