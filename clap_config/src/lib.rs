@@ -105,14 +105,15 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 }
 
 fn variants_to_fields(variants: &Punctuated<syn::Variant, Comma>) -> TokenStream {
-    let optional_fields = variants.iter().map(|v| {
+    let optional_fields = variants.iter().filter_map(|v| {
         let name = Ident::new(
             &v.ident.to_string().as_str().to_snake_case(),
             v.ident.span(),
         );
-        let f = get_variant_field(v);
+        // Skip unit subcommand fields (as they have no opts to configure).
+        let f = get_variant_field(v)?;
         let ty = make_subcommand_ty(&f.ty);
-        quote_spanned!(f.span()=> #name: std::option::Option<#ty>)
+        Some(quote_spanned!(f.span()=> #name: std::option::Option<#ty>))
     });
 
     quote! {
@@ -120,21 +121,31 @@ fn variants_to_fields(variants: &Punctuated<syn::Variant, Comma>) -> TokenStream
     }
 }
 
-fn get_variant_field(v: &Variant) -> &Field {
-    let f = match v.fields {
-        Fields::Named(ref fields) => fields
-            .named
-            .iter()
-            .next()
-            .expect("Expected enum variant to have a single named field"),
-        Fields::Unnamed(ref fields) => fields
-            .unnamed
-            .iter()
-            .next()
-            .expect("Expected enum variant to have a single unnamed field"),
-        _ => unimplemented!("Haven't implemented other types of enum variant"),
-    };
-    f
+/**
+Get the field to use for a variant of a subcommand if there is an associated fieeld.
+
+e.g. for `SubCommand::SubCommandA(opts: Opts)` -> `Some(opts: Opts)`
+e.g. for `SubCommand::SubCommandA(Opts)` -> `Some(Opts)`
+e.g. for `SubCommand::SubCommandA` -> `None`
+*/
+fn get_variant_field(v: &Variant) -> Option<&Field> {
+    match v.fields {
+        Fields::Named(ref fields) => Some(
+            fields
+                .named
+                .iter()
+                .next()
+                .expect("Expected enum variant to have a single named field"),
+        ),
+        Fields::Unnamed(ref fields) => Some(
+            fields
+                .unnamed
+                .iter()
+                .next()
+                .expect("Expected enum variant to have a single unnamed field"),
+        ),
+        Fields::Unit => None,
+    }
 }
 
 /// Convert any fields that aren't already `Option<...>` to `Option<...>` fields, ensuring
@@ -325,7 +336,10 @@ fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>
         // TODO(gib): handle non-standard formats.
         let kebab_case_name = &name.to_string().as_str().to_kebab_case();
         let snake_case_ident = Ident::new(&name.to_string().as_str().to_snake_case(), name.span());
-        let f = get_variant_field(v);
+        let Some(f) = get_variant_field(v) else {
+            // Unit variant has no fields, so just return it.
+            return quote!(#kebab_case_name => Self::#name,);
+        };
         let ty = &f.ty;
 
         let subcmd_opts_name = &ty;
