@@ -86,7 +86,13 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     }
 
     let output = quote!(
-        #[derive(std::default::Default, std::fmt::Debug, std::clone::Clone, serde::Deserialize, serde::Serialize)]
+        #[derive(
+            std::default::Default,
+            std::fmt::Debug,
+            std::clone::Clone,
+            serde::Deserialize,
+            serde::Serialize,
+        )]
         pub struct #config_ident {
             #config_fields
         }
@@ -218,8 +224,13 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
                 quote_spanned! {span=>
                     let #name: #ty = {
-                        if let Some((subcommand_name, subcommand_matches)) = matches.remove_subcommand() {
-                            Some(#stripped_ty :: from_merged(subcommand_name, subcommand_matches, config.and_then(|c| c.#name.clone())))
+                        if let Some((subcommand_name,
+                                     subcommand_matches)) = matches.remove_subcommand() {
+                            Some(#stripped_ty :: from_merged(
+                                subcommand_name,
+                                subcommand_matches,
+                                config.and_then(|c| c.#name.clone())
+                            ))
                         } else {
                             None
                         }
@@ -287,7 +298,10 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
     });
 
     quote! {
-        pub fn from_merged(mut matches: clap::ArgMatches, mut config: ::std::option::Option<#config_ident>) -> Self {
+        pub fn from_merged(
+            mut matches: clap::ArgMatches,
+            mut config: ::std::option::Option<#config_ident>
+        ) -> Self {
 
             #(#field_updates)*
 
@@ -316,13 +330,20 @@ fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>
 
         let subcmd_opts_name = &ty;
 
-        quote!{
-            #kebab_case_name => Self::#name(#subcmd_opts_name::from_merged(matches, config.and_then(|c| c.#snake_case_ident))),
+        quote! {
+            #kebab_case_name => Self::#name(
+                #subcmd_opts_name::from_merged(matches,
+                    config.and_then(|c| c.#snake_case_ident))
+            ),
         }
     });
 
     quote! {
-        pub fn from_merged(subcommand_name: String, mut matches: clap::ArgMatches, mut config: ::std::option::Option<#config_ident>) -> Self {
+        pub fn from_merged(
+            subcommand_name: String,
+            mut matches: clap::ArgMatches,
+            mut config: ::std::option::Option<#config_ident>
+        ) -> Self {
             match subcommand_name.as_str() {
                 #(#match_arms)*
                 _ => unimplemented!("Should have exhaustively checked all possible subcommands."),
@@ -402,7 +423,6 @@ fn is_field_marked_skipped(f: &Field) -> Result<bool, TokenStream> {
             let expr = attr
                 .parse_args::<Expr>()
                 .map_err(|e| e.into_compile_error())?;
-            eprintln!("Contents: {}: {expr:?}", quote!(#attr));
             if let Expr::Path(ExprPath { path, .. }) = expr {
                 if path.is_ident("skip") {
                     return Ok(true);

@@ -352,7 +352,9 @@ pub struct Opts {
     #[clap(long)]
     toplevel_flag_vec_single: Vec<String>,
 
-    #[clap(long, default_values_t = vec![TOPLEVEL_FLAG_VEC_MULTIPLE_DEFAULT_ONE.to_owned(), TOPLEVEL_FLAG_VEC_MULTIPLE_DEFAULT_TWO.to_owned()])]
+    #[clap(long, default_values_t = vec![
+        TOPLEVEL_FLAG_VEC_MULTIPLE_DEFAULT_ONE.to_owned(),
+        TOPLEVEL_FLAG_VEC_MULTIPLE_DEFAULT_TWO.to_owned()])]
     toplevel_flag_vec_multiple: Vec<String>,
 
     #[clap(long, default_value = TOPLEVEL_FLAG_BYTESIZE_DEFAULT)]
@@ -402,7 +404,9 @@ pub struct SubcommandAOptions {
     #[clap(long)]
     subcommand_a_flag_vec_single: Vec<String>,
 
-    #[clap(long, default_values_t = vec![SUBCOMMAND_A_FLAG_VEC_MULTIPLE_DEFAULT_ONE.to_owned(), SUBCOMMAND_A_FLAG_VEC_MULTIPLE_DEFAULT_TWO.to_owned()])]
+    #[clap(long, default_values_t = vec![
+        SUBCOMMAND_A_FLAG_VEC_MULTIPLE_DEFAULT_ONE.to_owned(),
+        SUBCOMMAND_A_FLAG_VEC_MULTIPLE_DEFAULT_TWO.to_owned()])]
     subcommand_a_flag_vec_multiple: Vec<String>,
 
     #[clap(long, default_value = SUBCOMMAND_A_FLAG_BYTESIZE_DEFAULT)]
@@ -443,7 +447,9 @@ pub struct SubcommandBOptions {
     #[clap(long)]
     subcommand_b_flag_vec_single: Vec<String>,
 
-    #[clap(long, default_values_t = vec![SUBCOMMAND_B_FLAG_VEC_MULTIPLE_DEFAULT_ONE.to_owned(), SUBCOMMAND_B_FLAG_VEC_MULTIPLE_DEFAULT_TWO.to_owned()])]
+    #[clap(long, default_values_t = vec![
+        SUBCOMMAND_B_FLAG_VEC_MULTIPLE_DEFAULT_ONE.to_owned(),
+        SUBCOMMAND_B_FLAG_VEC_MULTIPLE_DEFAULT_TWO.to_owned()])]
     subcommand_b_flag_vec_multiple: Vec<String>,
 
     #[clap(long, default_value = SUBCOMMAND_B_FLAG_BYTESIZE_DEFAULT)]

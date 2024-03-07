@@ -134,7 +134,9 @@ pub struct Opts {
     #[clap(long)]
     flag_vec_single: Vec<String>,
 
-    #[clap(long, default_values_t = vec![FLAG_VEC_MULTIPLE_DEFAULT_A.to_owned(), FLAG_VEC_MULTIPLE_DEFAULT_B.to_owned()])]
+    #[clap(long, default_values_t = vec![
+        FLAG_VEC_MULTIPLE_DEFAULT_A.to_owned(),
+        FLAG_VEC_MULTIPLE_DEFAULT_B.to_owned()])]
     flag_vec_multiple: Vec<String>,
 
     #[clap(long, default_value = FLAG_BYTESIZE_DEFAULT)]
