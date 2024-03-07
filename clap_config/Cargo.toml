@@ -13,12 +13,19 @@ repository.workspace=true
 readme.workspace=true
 authors.workspace=true
 
+exclude = ["tests/"]
+
 [lib]
 proc-macro = true
-
-[dev-dependencies]
 
 [dependencies]
 proc-macro2 = "1.0.71"
 quote = "1.0.33"
 syn = { version = "2.0.42", features = ["full"] } # Add "extra-traits" feature to debug.
+serde = { version = "1.0.193", features = ["derive"] }
+
+[dev-dependencies]
+clap = { version = "4.4.11", features = ["derive", "env", "string", "wrap_help"] }
+color-eyre = "0.6.2"
+serde_json = "1.0.108"
+serde_yaml = "0.9.29"
