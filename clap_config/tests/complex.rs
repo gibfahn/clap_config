@@ -163,7 +163,7 @@ pub enum FlagEnum {
 fn test_nothing_set() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(UNSET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(UNSET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_DEFAULT.to_owned(),
@@ -190,7 +190,7 @@ fn test_nothing_set() -> Result<()> {
 fn test_args_set() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(UNSET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_ARG.to_owned(),
@@ -218,7 +218,7 @@ fn test_args_set() -> Result<()> {
 fn test_config_set() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(UNSET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(SET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_CONFIG.to_owned(),
@@ -247,7 +247,7 @@ fn test_config_set() -> Result<()> {
 fn test_both_set() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(SET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_ARG.to_owned(),

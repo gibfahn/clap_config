@@ -48,10 +48,10 @@ let matches = <Opts as CommandFactory>::command().get_matches();
 let config: OptsConfig = serde_yaml::from_str(&config_str).unwrap();
 
 // Merge the two together into your actual struct.
-let opts = Opts::from_merged(matches, config);
+let opts = Opts::from_merged(matches, Some(config));
 ```
 */
-#[proc_macro_derive(ClapConfig)]
+#[proc_macro_derive(ClapConfig, attributes(clap_config))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -196,7 +196,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                 quote_spanned! {span=>
                     let #name: #ty = {
                         if let Some((subcommand_name, subcommand_matches)) = matches.remove_subcommand() {
-                            Some(#stripped_ty :: from_merged(subcommand_name, subcommand_matches, config.#name.clone()))
+                            Some(#stripped_ty :: from_merged(subcommand_name, subcommand_matches, config.and_then(|c| c.#name.clone())))
                         } else {
                             None
                         }
@@ -211,7 +211,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             // User-specified field's type was `Option<T>`
             quote_spanned! {span=>
                 let #name: #ty = {
-                    let config_value: #ty = config.#name.take();
+                    let config_value: #ty = config.as_mut().and_then(|c| c.#name.take());
                     if matches.contains_id(#name_str) {
                         let value_source = matches.value_source(#name_str).expect("checked contains_id");
                         let matches_value: #stripped_ty = matches.remove_one(#name_str).expect("checked contains_id");
@@ -229,7 +229,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             // User-specified field's type was `Vec<T>`
             quote_spanned! {span=>
                 let #name: #ty = {
-                    let config_value: std::option::Option<#ty> = config.#name.take();
+                    let config_value: std::option::Option<#ty> = config.as_mut().and_then(|c| c.#name.take());
                     if matches.contains_id(#name_str) {
                         let value_source = matches.value_source(#name_str).expect("checked contains_id");
                         let matches_value: #ty = matches.remove_many(#name_str).expect("checked contains_id").collect();
@@ -246,7 +246,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
         } else {
             quote_spanned! {span=>
                 let #name: #ty = {
-                    let config_value: std::option::Option<#ty> = config.#name.take();
+                    let config_value: std::option::Option<#ty> = config.as_mut().and_then(|c| c.#name.take());
                     if matches.contains_id(#name_str) {
                         let value_source = matches.value_source(#name_str).expect("checked contains_id");
                         let matches_value: #ty = matches.remove_one(#name_str).expect("checked contains_id");
@@ -264,7 +264,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
     });
 
     quote! {
-        pub fn from_merged(mut matches: clap::ArgMatches, mut config: #config_ident) -> Self {
+        pub fn from_merged(mut matches: clap::ArgMatches, mut config: ::std::option::Option<#config_ident>) -> Self {
 
             #(#field_updates)*
 
@@ -294,7 +294,7 @@ fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>
         let subcmd_opts_name = &ty;
 
         quote!{
-            #kebab_case_name => Self::#name(#subcmd_opts_name::from_merged(matches, config.unwrap_or_default().#snake_case_ident.unwrap_or_default())),
+            #kebab_case_name => Self::#name(#subcmd_opts_name::from_merged(matches, config.and_then(|c| c.#snake_case_ident))),
         }
     });
 

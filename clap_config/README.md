@@ -29,7 +29,7 @@ let matches = <Opts as CommandFactory>::command().get_matches();
 let config: OptsConfig = serde_yaml::from_str(&config_str).unwrap();
 
 // Merge the two together into your actual struct.
-let opts = Opts::from_merged(matches, config);
+let opts = Opts::from_merged(matches, Some(config));
 ```
 
 ## Todos

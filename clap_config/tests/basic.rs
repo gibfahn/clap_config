@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(unset_args);
         let config: OptsConfig = serde_yaml::from_str(unset_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         assert_eq!(FROM_DEFAULT, opts.flag);
     }
 
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(set_args);
         let config: OptsConfig = serde_yaml::from_str(unset_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         assert_eq!(FROM_ARG, opts.flag);
     }
 
@@ -43,7 +43,7 @@ fn main() -> Result<()> {
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(unset_args);
         let config: OptsConfig = serde_yaml::from_str(set_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         assert_eq!(FROM_CONFIG, opts.flag);
     }
 
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(set_args);
         let config: OptsConfig = serde_yaml::from_str(set_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         assert_eq!(FROM_ARG, opts.flag);
     }
 

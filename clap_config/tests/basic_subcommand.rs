@@ -53,7 +53,7 @@ subcommand_a:
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(no_subcommand_args);
         let config: OptsConfig = serde_yaml::from_str(unset_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         assert_eq!(None, opts.cmd);
     }
 
@@ -61,7 +61,7 @@ subcommand_a:
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(unset_args);
         let config: OptsConfig = serde_yaml::from_str(unset_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         let flag_a = match opts.cmd.unwrap() {
             SubCommand::SubcommandA(SubcommandAOptions { flag_a }) => flag_a,
             subcmd => bail!("Expected subcommand A, found: {subcmd:?}"),
@@ -73,7 +73,7 @@ subcommand_a:
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(set_args);
         let config: OptsConfig = serde_yaml::from_str(unset_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         let flag_a = match opts.cmd.unwrap() {
             SubCommand::SubcommandA(SubcommandAOptions { flag_a }) => flag_a,
             subcmd => bail!("Expected subcommand A, found: {subcmd:?}"),
@@ -85,7 +85,7 @@ subcommand_a:
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(unset_args);
         let config: OptsConfig = serde_yaml::from_str(set_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         let flag_a = match opts.cmd.unwrap() {
             SubCommand::SubcommandA(SubcommandAOptions { flag_a }) => flag_a,
             subcmd => bail!("Expected subcommand A, found: {subcmd:?}"),
@@ -97,7 +97,7 @@ subcommand_a:
     {
         let matches = <Opts as CommandFactory>::command().get_matches_from(set_args);
         let config: OptsConfig = serde_yaml::from_str(set_config)?;
-        let opts = Opts::from_merged(matches, config);
+        let opts = Opts::from_merged(matches, Some(config));
         let flag_a = match opts.cmd.unwrap() {
             SubCommand::SubcommandA(SubcommandAOptions { flag_a }) => flag_a,
             subcmd => bail!("Expected subcommand A, found: {subcmd:?}"),

@@ -488,7 +488,7 @@ pub enum SubcommandBFlagEnum {
 fn test_nothing_set_subcommand_a() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_A_UNSET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(UNSET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_DEFAULT.to_owned(),
@@ -532,7 +532,7 @@ fn test_nothing_set_subcommand_a() -> Result<()> {
 fn test_nothing_set_subcommand_b() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_B_UNSET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(UNSET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_DEFAULT.to_owned(),
@@ -576,7 +576,7 @@ fn test_nothing_set_subcommand_b() -> Result<()> {
 fn test_args_set_subcommand_a() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_A_SET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(UNSET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_ARG.to_owned(),
@@ -621,7 +621,7 @@ fn test_args_set_subcommand_a() -> Result<()> {
 fn test_args_set_subcommand_b() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_B_SET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(UNSET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_ARG.to_owned(),
@@ -666,7 +666,7 @@ fn test_args_set_subcommand_b() -> Result<()> {
 fn test_config_set_subcommand_a() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_A_UNSET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(SET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_CONFIG.to_owned(),
@@ -716,7 +716,7 @@ fn test_config_set_subcommand_a() -> Result<()> {
 fn test_config_set_subcommand_b() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_B_UNSET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(SET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_CONFIG.to_owned(),
@@ -766,7 +766,7 @@ fn test_config_set_subcommand_b() -> Result<()> {
 fn test_both_set_subcommand_a() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_A_SET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(SET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_ARG.to_owned(),
@@ -811,7 +811,7 @@ fn test_both_set_subcommand_a() -> Result<()> {
 fn test_both_set_subcommand_b() -> Result<()> {
     let matches = <Opts as CommandFactory>::command().get_matches_from(SUBCOMMAND_B_SET_ARGS);
     let config: OptsConfig = serde_yaml::from_str(SET_CONFIG)?;
-    let opts = Opts::from_merged(matches, config);
+    let opts = Opts::from_merged(matches, Some(config));
 
     let expected_opts = Opts {
         toplevel_flag_string: TOPLEVEL_FLAG_STRING_ARG.to_owned(),
