@@ -24,6 +24,7 @@ use syn::PathSegment;
 use syn::Token;
 use syn::Type;
 use syn::TypePath;
+use syn::TypeTuple;
 use syn::Variant;
 
 const CLAP_CONFIG_ATTR_NAME: &str = "clap_config";
@@ -155,7 +156,8 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
 
     for f in fields {
         let name = &f.ident;
-        let ty = &f.ty;
+        let f_ty = &f.ty;
+        let mut ty = quote!(#f_ty);
 
         match is_field_marked_skipped(f) {
             Ok(true) => continue,
@@ -163,6 +165,11 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
             Err(e) => return quote!(#e),
         }
 
+        if is_vec_tuple_string(f) {
+            ty = quote!(
+                std::collections::BTreeMap<std::string::String, std::string::String>
+            );
+        }
         if is_subcommand_field(f).expect("Failed to check if subcommand field is field") {
             let ty = make_subcommand_ty(strip_optional_wrapper_if_present(f).unwrap_or(&f.ty));
             optional_fields.push(quote_spanned!(f.span()=>
@@ -219,6 +226,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
         let ty = &f.ty;
         let span = ty.span();
         let name_str = name.as_ref().map(|name| name.to_string()).expect("Expected field to have a name");
+        let name_str = name_str.strip_prefix("r#").unwrap_or(&name_str);
 
         let is_skipped = match is_field_marked_skipped(f) {
             Ok(b) => b,
@@ -275,6 +283,31 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                     }
                 };
             }
+        } else if is_vec_tuple_string(f) {
+            quote_spanned! {span=>
+                let #name: #ty = {
+                    let config_value: std::option::Option<std::collections::BTreeMap<std::string::String, std::string::String>> = #config_value_expr;
+                    if matches.contains_id(#name_str) {
+                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #ty = matches.remove_many(#name_str).expect("checked contains_id").collect();
+                        if value_source == clap::parser::ValueSource::DefaultValue {
+                            config_value
+                                .map_or(matches_value, |m| m
+                                    .into_iter()
+                                    .collect::<Vec<(std::string::String, std::string::String)>>()
+                                )
+                        } else {
+                            matches_value
+                        }
+                    } else {
+                        config_value
+                            .map(|h|
+                                h.into_iter()
+                                 .collect::<Vec<(std::string::String, std::string::String)>>()
+                            ).unwrap_or_default()
+                    }
+                };
+            }
         } else if strip_vec_wrapper_if_present(f).is_some() {
             // User-specified field's type was `Vec<T>`
             quote_spanned! {span=>
@@ -306,7 +339,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                             matches_value
                         }
                     } else {
-                        config_value.expect("Required arg #name not provided in args or config.")
+                        config_value.expect(&format!("Required arg '{}' not provided in args or config.", #name_str))
                     }
                 };
             }
@@ -392,6 +425,41 @@ fn strip_optional_wrapper_if_present(f: &Field) -> Option<&Type> {
         }
     }
     None
+}
+
+/// If the field type is `Vec<(String, String)>`, return `true`. Else return `false`.
+fn is_vec_tuple_string(f: &Field) -> bool {
+    let ty = &f.ty;
+    fn path_is_ident(elem: Option<&Type>, ident: &Ident) -> bool {
+        let Some(elem) = elem else { return false };
+        if let Type::Path(TypePath { path, .. }) = elem {
+            return path.is_ident(ident);
+        }
+        false
+    }
+
+    if let Type::Path(TypePath { path, .. }) = ty {
+        if let Some(PathSegment { ident, arguments }) = path.segments.last() {
+            if ident == &Ident::new("Vec", f.span()) {
+                if let PathArguments::AngleBracketed(AngleBracketedGenericArguments {
+                    args, ..
+                }) = arguments
+                {
+                    if let Some(GenericArgument::Type(Type::Tuple(TypeTuple { elems, .. }))) =
+                        args.first()
+                    {
+                        let string_ident = Ident::new("String", f.span());
+                        if path_is_ident(elems.first(), &string_ident)
+                            && path_is_ident(elems.last(), &string_ident)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 /// If the field type is `Vec<Foo>`, return `Some(Foo)`. Else return `None`.
