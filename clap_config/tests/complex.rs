@@ -54,8 +54,10 @@ const FLAG_ENUM_DEFAULT: FlagEnum = FlagEnum::DefaultValue;
 const FLAG_ENUM_ARG: &str = "arg-value";
 const FLAG_ENUM_CONFIG: &str = "ConfigValue";
 
+const POSITIONAL_STRING_ARG: &str = "positional-string-arg";
+
 const UNSET_ARGS: [&str; 1] = ["myapp"];
-const SET_ARGS: [&str; 21] = [
+const SET_ARGS: [&str; 22] = [
     "myapp",
 
     "--flag-string",
@@ -88,6 +90,8 @@ const SET_ARGS: [&str; 21] = [
 
     "--flag-option-enum",
     FLAG_ENUM_ARG,
+
+    POSITIONAL_STRING_ARG,
 
 ];
 
@@ -154,6 +158,9 @@ pub struct Opts {
 
     #[clap(value_enum, long)]
     flag_option_enum: Option<FlagEnum>,
+
+    // No clap(long) here, this is a positional arg, which can't be set via config.
+    positional_string: Option<String>,
 }
 
 /// When to update the Xbs dependency database cache.
@@ -186,6 +193,7 @@ fn test_nothing_set() -> Result<()> {
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_DEFAULT).unwrap(),
         flag_enum: FLAG_ENUM_DEFAULT,
         flag_option_enum: None,
+        positional_string: None,
     };
 
     assert_eq!(expected_opts, opts);
@@ -213,6 +221,7 @@ fn test_args_set() -> Result<()> {
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_ARG).unwrap(),
         flag_enum: FlagEnum::ArgValue,
         flag_option_enum: Some(FlagEnum::ArgValue),
+        positional_string: Some(POSITIONAL_STRING_ARG.to_owned()),
     };
 
     assert_eq!(expected_opts, opts);
@@ -241,6 +250,7 @@ fn test_config_set() -> Result<()> {
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_CONFIG).unwrap(),
         flag_enum: FlagEnum::ConfigValue,
         flag_option_enum: Some(FlagEnum::ConfigValue),
+        positional_string: None,
     };
 
     assert_eq!(expected_opts, opts);
@@ -268,6 +278,7 @@ fn test_both_set() -> Result<()> {
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_ARG).unwrap(),
         flag_enum: FlagEnum::ArgValue,
         flag_option_enum: Some(FlagEnum::ArgValue),
+        positional_string: Some(POSITIONAL_STRING_ARG.to_owned()),
     };
 
     assert_eq!(expected_opts, opts);
