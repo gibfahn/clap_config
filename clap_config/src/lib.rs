@@ -240,7 +240,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                             Some(#stripped_ty :: from_merged(
                                 subcommand_name,
                                 subcommand_matches,
-                                config.and_then(|c| c.#name.clone())
+                                config.as_ref().and_then(|c| c.#name.clone())
                             ))
                         } else {
                             None
