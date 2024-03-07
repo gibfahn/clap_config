@@ -23,7 +23,8 @@ proc-macro2 = "1.0.71"
 quote = "1.0.33"
 syn = { version = "2.0.42", features = [
   "full",
-] } # Add "extra-traits" feature to debug.
+  # "extra-traits", # Uncomment to debug syn.
+] }
 serde = { version = "1.0.193", features = ["derive"] }
 clap = { version = "4.4.11", features = [
   "derive",

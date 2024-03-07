@@ -12,6 +12,8 @@ use syn::token::Comma;
 use syn::AngleBracketedGenericArguments;
 use syn::Data;
 use syn::DeriveInput;
+use syn::Expr;
+use syn::ExprPath;
 use syn::Field;
 use syn::Fields;
 use syn::GenericArgument;
@@ -23,6 +25,8 @@ use syn::Token;
 use syn::Type;
 use syn::TypePath;
 use syn::Variant;
+
+const CLAP_CONFIG_ATTR_NAME: &str = "clap_config";
 
 /**
 Generate a config struct and a method to merge the two values together.
@@ -130,22 +134,30 @@ fn get_variant_field(v: &Variant) -> &Field {
 /// Convert any fields that aren't already `Option<...>` to `Option<...>` fields, ensuring
 /// everything is optional.
 fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
-    let optional_fields = fields.iter().map(|f| {
+    let mut optional_fields = vec![];
+
+    for f in fields {
         let name = &f.ident;
         let ty = &f.ty;
 
+        match is_field_marked_skipped(f) {
+            Ok(true) => continue,
+            Ok(false) => (),
+            Err(e) => return quote!(#e),
+        }
+
         if is_subcommand_field(f).expect("Failed to check if subcommand field is field") {
             let ty = make_subcommand_ty(strip_optional_wrapper_if_present(f).unwrap_or(&f.ty));
-            quote_spanned!(f.span()=>
+            optional_fields.push(quote_spanned!(f.span()=>
                 #[serde(flatten)]
                 #name: std::option::Option<#ty>
-            )
+            ))
         } else if strip_optional_wrapper_if_present(f).is_some() {
-            quote_spanned!(f.span()=> #name: #ty)
+            optional_fields.push(quote_spanned!(f.span()=> #name: #ty))
         } else {
-            quote_spanned!(f.span()=> #name: std::option::Option<#ty>)
+            optional_fields.push(quote_spanned!(f.span()=> #name: std::option::Option<#ty>))
         }
-    });
+    }
 
     quote! {
         #(#optional_fields),*
@@ -191,6 +203,17 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
         let span = ty.span();
         let name_str = name.as_ref().map(|name| name.to_string()).expect("Expected field to have a name");
 
+        let is_skipped = match is_field_marked_skipped(f) {
+            Ok(b) => b,
+            Err(e) => return quote!(#e),
+        };
+
+        let config_value_expr = if is_skipped {
+            quote!(None)
+        } else {
+            quote!(config.as_mut().and_then(|c| c.#name.take()))
+        };
+
         if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
             if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
                 quote_spanned! {span=>
@@ -211,7 +234,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             // User-specified field's type was `Option<T>`
             quote_spanned! {span=>
                 let #name: #ty = {
-                    let config_value: #ty = config.as_mut().and_then(|c| c.#name.take());
+                    let config_value: #ty = #config_value_expr;
                     if matches.contains_id(#name_str) {
                         let value_source = matches.value_source(#name_str).expect("checked contains_id");
                         let matches_value: #stripped_ty = matches.remove_one(#name_str).expect("checked contains_id");
@@ -229,7 +252,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             // User-specified field's type was `Vec<T>`
             quote_spanned! {span=>
                 let #name: #ty = {
-                    let config_value: std::option::Option<#ty> = config.as_mut().and_then(|c| c.#name.take());
+                    let config_value: std::option::Option<#ty> = #config_value_expr;
                     if matches.contains_id(#name_str) {
                         let value_source = matches.value_source(#name_str).expect("checked contains_id");
                         let matches_value: #ty = matches.remove_many(#name_str).expect("checked contains_id").collect();
@@ -246,7 +269,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
         } else {
             quote_spanned! {span=>
                 let #name: #ty = {
-                    let config_value: std::option::Option<#ty> = config.as_mut().and_then(|c| c.#name.take());
+                    let config_value: std::option::Option<#ty> = #config_value_expr;
                     if matches.contains_id(#name_str) {
                         let value_source = matches.value_source(#name_str).expect("checked contains_id");
                         let matches_value: #ty = matches.remove_one(#name_str).expect("checked contains_id");
@@ -370,4 +393,29 @@ fn is_subcommand_field(f: &Field) -> Result<bool, syn::Error> {
     }
 
     Ok(is_subcommand)
+}
+
+/// Check whether the user has asked us to skip generating/checking the config for this field.
+fn is_field_marked_skipped(f: &Field) -> Result<bool, TokenStream> {
+    for attr in f.attrs.iter() {
+        if attr.path().is_ident(CLAP_CONFIG_ATTR_NAME) {
+            let expr = attr
+                .parse_args::<Expr>()
+                .map_err(|e| e.into_compile_error())?;
+            eprintln!("Contents: {}: {expr:?}", quote!(#attr));
+            if let Expr::Path(ExprPath { path, .. }) = expr {
+                if path.is_ident("skip") {
+                    return Ok(true);
+                } else {
+                    return Err(syn::Error::new_spanned(
+                        &attr.meta,
+                        format!("expected `clap_config(skip)`, found {}", quote!(#attr)),
+                    )
+                    .into_compile_error());
+                }
+            }
+        }
+    }
+
+    Ok(false)
 }
