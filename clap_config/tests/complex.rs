@@ -1,9 +1,13 @@
-//! Tests that the macro produces usable output for a complex clap derived struct (that doesn't
-//! include any subcommands).
+/*!
+Tests that the macro produces usable output for a complex clap derived struct (that doesn't
+include any subcommands).
+*/
 
+use bytesize::ByteSize;
 use clap::ArgAction;
 use clap::CommandFactory;
 use clap::Parser;
+use std::str::FromStr;
 use clap_config::ClapConfig;
 use color_eyre::Result;
 use const_format::formatcp;
@@ -39,38 +43,61 @@ const FLAG_VEC_MULTIPLE_CONFIG_B: &str = "flag-vec-multiple-config-b";
 const FLAG_VEC_MULTIPLE_CONFIG_C: &str = "flag-vec-multiple-config-c";
 const FLAG_VEC_MULTIPLE_CONFIG_D: &str = "flag-vec-multiple-config-d";
 
+const FLAG_BYTESIZE_DEFAULT: &str = "200GB";
+const FLAG_BYTESIZE_ARG: &str = "100MB";
+const FLAG_BYTESIZE_CONFIG: &str = "20Gi";
+
 const UNSET_ARGS: [&str; 1] = ["myapp"];
-const SET_ARGS: [&str; 15] = [
+const SET_ARGS: [&str; 17] = [
     "myapp",
+
     "--flag-string",
     FLAG_STRING_ARG,
+
     "--flag-bool-a",
+
     "--flag-bool-b=false",
+
     "--flag-option-string",
     FLAG_OPTION_STRING_ARG,
+
     "--flag-vec-single",
     FLAG_VEC_SINGLE_ARG,
+
     "--flag-vec-multiple",
     FLAG_VEC_MULTIPLE_ARG_A,
+
     "--flag-vec-multiple",
     FLAG_VEC_MULTIPLE_ARG_B,
+
     "--flag-vec-multiple",
     FLAG_VEC_MULTIPLE_ARG_C,
+
+    "--flag-bytesize",
+    FLAG_BYTESIZE_ARG,
+
 ];
 
 const UNSET_CONFIG: &str = "";
 const SET_CONFIG: &str = formatcp!(
     "---
 flag_string: {FLAG_STRING_CONFIG}
+
 flag_bool_a: {FLAG_BOOL_A_CONFIG}
+
 flag_bool_b: {FLAG_BOOL_B_CONFIG}
+
 flag_option_string: {FLAG_OPTION_STRING_CONFIG}
+
 flag_vec_single: [{FLAG_VEC_SINGLE_CONFIG}]
+
 flag_vec_multiple:
 - {FLAG_VEC_MULTIPLE_CONFIG_A}
 - {FLAG_VEC_MULTIPLE_CONFIG_B}
 - {FLAG_VEC_MULTIPLE_CONFIG_C}
 - {FLAG_VEC_MULTIPLE_CONFIG_D}
+
+flag_bytesize: {FLAG_BYTESIZE_CONFIG}
 "
 );
 
@@ -78,8 +105,10 @@ flag_vec_multiple:
 pub struct Opts {
     #[clap(long, default_value = FLAG_STRING_DEFAULT)]
     flag_string: String,
+
     #[clap(long)]
     flag_bool_a: bool,
+
     #[clap(
         long,
         default_value_t = FLAG_BOOL_B_DEFAULT,
@@ -90,12 +119,18 @@ pub struct Opts {
         num_args(0..=1),
     )]
     flag_bool_b: bool,
+
     #[clap(long)]
     flag_option_string: Option<String>,
+
     #[clap(long)]
     flag_vec_single: Vec<String>,
+
     #[clap(long, default_values_t = vec![FLAG_VEC_MULTIPLE_DEFAULT_A.to_owned(), FLAG_VEC_MULTIPLE_DEFAULT_B.to_owned()])]
     flag_vec_multiple: Vec<String>,
+
+    #[clap(long, default_value = FLAG_BYTESIZE_DEFAULT)]
+    flag_bytesize: ByteSize,
 }
 
 /// Nothing set anywhere.
@@ -115,6 +150,7 @@ fn test_nothing_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_DEFAULT_A.to_owned(),
             FLAG_VEC_MULTIPLE_DEFAULT_B.to_owned(),
         ],
+        flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_DEFAULT).unwrap(),
     };
 
     assert_eq!(expected_opts, opts);
@@ -139,6 +175,7 @@ fn test_args_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_ARG_B.to_owned(),
             FLAG_VEC_MULTIPLE_ARG_C.to_owned(),
         ],
+        flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_ARG).unwrap(),
     };
 
     assert_eq!(expected_opts, opts);
@@ -164,6 +201,7 @@ fn test_config_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_CONFIG_C.to_owned(),
             FLAG_VEC_MULTIPLE_CONFIG_D.to_owned(),
         ],
+        flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_CONFIG).unwrap(),
     };
 
     assert_eq!(expected_opts, opts);
@@ -188,6 +226,7 @@ fn test_both_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_ARG_B.to_owned(),
             FLAG_VEC_MULTIPLE_ARG_C.to_owned(),
         ],
+        flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_ARG).unwrap(),
     };
 
     assert_eq!(expected_opts, opts);
