@@ -3,10 +3,13 @@ Tests that the macro produces usable output for a complex clap derived struct (t
 include any subcommands).
 */
 
+use clap::ValueEnum;
+use serde::Deserialize;
 use bytesize::ByteSize;
 use clap::ArgAction;
 use clap::CommandFactory;
 use clap::Parser;
+use serde::Serialize;
 use std::str::FromStr;
 use clap_config::ClapConfig;
 use color_eyre::Result;
@@ -47,8 +50,12 @@ const FLAG_BYTESIZE_DEFAULT: &str = "200GB";
 const FLAG_BYTESIZE_ARG: &str = "100MB";
 const FLAG_BYTESIZE_CONFIG: &str = "20Gi";
 
+const FLAG_ENUM_DEFAULT: FlagEnum = FlagEnum::DefaultValue;
+const FLAG_ENUM_ARG: &str = "arg-value";
+const FLAG_ENUM_CONFIG: &str = "ConfigValue";
+
 const UNSET_ARGS: [&str; 1] = ["myapp"];
-const SET_ARGS: [&str; 17] = [
+const SET_ARGS: [&str; 21] = [
     "myapp",
 
     "--flag-string",
@@ -76,6 +83,12 @@ const SET_ARGS: [&str; 17] = [
     "--flag-bytesize",
     FLAG_BYTESIZE_ARG,
 
+    "--flag-enum",
+    FLAG_ENUM_ARG,
+
+    "--flag-option-enum",
+    FLAG_ENUM_ARG,
+
 ];
 
 const UNSET_CONFIG: &str = "";
@@ -98,6 +111,10 @@ flag_vec_multiple:
 - {FLAG_VEC_MULTIPLE_CONFIG_D}
 
 flag_bytesize: {FLAG_BYTESIZE_CONFIG}
+
+flag_enum: {FLAG_ENUM_CONFIG}
+
+flag_option_enum: {FLAG_ENUM_CONFIG}
 "
 );
 
@@ -131,7 +148,23 @@ pub struct Opts {
 
     #[clap(long, default_value = FLAG_BYTESIZE_DEFAULT)]
     flag_bytesize: ByteSize,
+
+    #[clap(value_enum, long, default_value_t)]
+    flag_enum: FlagEnum,
+
+    #[clap(value_enum, long)]
+    flag_option_enum: Option<FlagEnum>,
 }
+
+/// When to update the Xbs dependency database cache.
+#[derive(Debug, Clone, ValueEnum, Default, Serialize, Deserialize, PartialEq)]
+pub enum FlagEnum {
+    #[default]
+    DefaultValue,
+    ArgValue,
+    ConfigValue,
+}
+
 
 /// Nothing set anywhere.
 #[test]
@@ -151,6 +184,8 @@ fn test_nothing_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_DEFAULT_B.to_owned(),
         ],
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_DEFAULT).unwrap(),
+        flag_enum: FLAG_ENUM_DEFAULT,
+        flag_option_enum: None,
     };
 
     assert_eq!(expected_opts, opts);
@@ -176,6 +211,8 @@ fn test_args_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_ARG_C.to_owned(),
         ],
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_ARG).unwrap(),
+        flag_enum: FlagEnum::ArgValue,
+        flag_option_enum: Some(FlagEnum::ArgValue),
     };
 
     assert_eq!(expected_opts, opts);
@@ -202,6 +239,8 @@ fn test_config_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_CONFIG_D.to_owned(),
         ],
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_CONFIG).unwrap(),
+        flag_enum: FlagEnum::ConfigValue,
+        flag_option_enum: Some(FlagEnum::ConfigValue),
     };
 
     assert_eq!(expected_opts, opts);
@@ -227,6 +266,8 @@ fn test_both_set() -> Result<()> {
             FLAG_VEC_MULTIPLE_ARG_C.to_owned(),
         ],
         flag_bytesize: ByteSize::from_str(FLAG_BYTESIZE_ARG).unwrap(),
+        flag_enum: FlagEnum::ArgValue,
+        flag_option_enum: Some(FlagEnum::ArgValue),
     };
 
     assert_eq!(expected_opts, opts);
