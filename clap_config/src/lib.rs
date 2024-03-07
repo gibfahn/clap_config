@@ -125,14 +125,14 @@ fn generate_merge_method(
         let span = ty.span();
         let name_str = name.as_ref().map(|name| name.to_string()).expect("Expected field to have a name");
 
-        if let Some(ty_stripped) = strip_optional_wrapper_if_present(f) {
-            // User-specified type was an `Option<T>`
+        if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
+            // User-specified field's type was `Option<T>`
             quote_spanned! {span=>
                 let #name: #ty = {
                     let config_value: #ty = config.#name.take();
                     if matches.contains_id(#name_str) {
                         let value_source = matches.value_source(#name_str).expect("checked contains_id");
-                        let matches_value: #ty_stripped = matches.remove_one(#name_str).expect("checked contains_id");
+                        let matches_value: #stripped_ty = matches.remove_one(#name_str).expect("checked contains_id");
                         if value_source == clap::parser::ValueSource::DefaultValue {
                             Some(config_value.unwrap_or(matches_value))
                         } else {
@@ -140,6 +140,24 @@ fn generate_merge_method(
                         }
                     } else {
                         config_value
+                    }
+                };
+            }
+        } else if strip_vec_wrapper_if_present(f).is_some() {
+            // User-specified field's type was `Vec<T>`
+            quote_spanned! {span=>
+                let #name: #ty = {
+                    let config_value: std::option::Option<#ty> = config.#name.take();
+                    if matches.contains_id(#name_str) {
+                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #ty = matches.remove_many(#name_str).expect("checked contains_id").collect();
+                        if value_source == clap::parser::ValueSource::DefaultValue {
+                            config_value.unwrap_or(matches_value)
+                        } else {
+                            matches_value
+                        }
+                    } else {
+                        config_value.unwrap_or_default()
                     }
                 };
             }
@@ -156,7 +174,7 @@ fn generate_merge_method(
                             matches_value
                         }
                     } else {
-                        config_value.expect("Value shouldn't be optional here")
+                        config_value.unwrap_or_default()
                     }
                 };
             }
@@ -192,5 +210,27 @@ fn strip_optional_wrapper_if_present(f: &Field) -> Option<&Type> {
             }
         }
     }
+    None
+}
+
+/// If the field type is `Vec<Foo>`, return `Some(Foo)`. Else return `None`.
+fn strip_vec_wrapper_if_present(f: &Field) -> Option<&Type> {
+    let ty = &f.ty;
+
+    if let Type::Path(TypePath { path, .. }) = ty {
+        if let Some(PathSegment { ident, arguments }) = path.segments.last() {
+            if ident == &Ident::new("Vec", f.span()) {
+                if let PathArguments::AngleBracketed(AngleBracketedGenericArguments {
+                    args, ..
+                }) = arguments
+                {
+                    if let Some(GenericArgument::Type(inner_type)) = args.first() {
+                        return Some(inner_type);
+                    }
+                }
+            }
+        }
+    }
+
     None
 }
