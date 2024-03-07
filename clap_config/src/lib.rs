@@ -249,7 +249,12 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                 }
             } else {
                 quote_spanned! {span=>
-                    let #name: #ty = #ty :: from_merged(subcommand_matches);
+                    let (subcommand_name, subcommand_matches) = matches.remove_subcommand().expect("Subcommand is required, so expected it to be set.");
+                    let #name: #ty = #ty :: from_merged(
+                        subcommand_name,
+                        subcommand_matches,
+                        config.as_ref().and_then(|c| c.#name.clone())
+                    );
                 }
             }
         } else if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
