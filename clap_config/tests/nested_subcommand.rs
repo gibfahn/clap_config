@@ -10,6 +10,9 @@ const FROM_DEFAULT_A: &str = "from-default-a";
 const FROM_ARG_A: &str = "from-arg-a";
 const FROM_CONFIG_A: &str = "from-config-a";
 
+const FROM_DEFAULT_C: &str = "from-default-c";
+const FROM_CONFIG_C: &str = "from-config-c";
+
 const FROM_DEFAULT_X: &str = "from-default-x";
 const FROM_ARG_X: &str = "from-arg-x";
 const FROM_CONFIG_X: &str = "from-config-x";
@@ -24,6 +27,7 @@ pub struct Opts {
 pub enum SubCommand {
     SubcommandA(SubcommandAOptions),
     SubcommandB,
+    SubcommandC(SubcommandCOptions),
 }
 
 #[derive(ClapConfig, Debug, Parser, Clone, PartialEq)]
@@ -46,12 +50,26 @@ pub struct SubcommandXOptions {
     flag_x: String,
 }
 
+#[derive(ClapConfig, Debug, Parser, Clone, PartialEq)]
+pub struct SubcommandCOptions {
+    #[clap(long, default_value = FROM_DEFAULT_C)]
+    flag_c: String,
+    #[clap(subcommand)]
+    pub(crate) subcommand_c_cmd: SubCommandCCmd,
+}
+
+#[derive(ClapConfig, Debug, Parser, Clone, PartialEq)]
+pub enum SubCommandCCmd {
+    SubcommandZ,
+}
+
 const NO_ARGS: [&str; 1] = ["myapp"];
 const UNSET_ARGS_A: [&str; 2] = ["myapp", "subcommand-a"];
 const SET_ARGS_A: [&str; 4] = ["myapp", "subcommand-a", "--flag-a", FROM_ARG_A];
 const SET_ARGS_B: [&str; 2] = ["myapp", "subcommand-b"];
 const UNSET_ARGS_X: [&str; 3] = ["myapp", "subcommand-a", "subcommand-x"];
 const UNSET_ARGS_Y: [&str; 3] = ["myapp", "subcommand-a", "subcommand-y"];
+const SET_ARGS_Z: [&str; 3] = ["myapp", "subcommand-c", "subcommand-z"];
 const SET_ARGS_X: [&str; 7] = [
     "myapp",
     "subcommand-a",
@@ -69,6 +87,8 @@ subcommand_a:
     flag_a: {FROM_CONFIG_A}
     subcommand_x:
         flag_x: {FROM_CONFIG_X}
+subcommand_c:
+    flag_c: {FROM_CONFIG_C}
 "
 );
 
@@ -259,6 +279,39 @@ fn nested_unit_subcommand() -> Result<()> {
             cmd: Some(SubCommand::SubcommandA(SubcommandAOptions {
                 flag_a: FROM_CONFIG_A.to_owned(),
                 subcommand_a_cmd: Some(SubCommandACmd::SubcommandY),
+            })),
+        };
+        assert_eq!(expected, opts);
+    }
+
+    Ok(())
+}
+
+#[test]
+fn nested_unit_nonoptional_subcommand() -> Result<()> {
+    // Nested unit subcommand passed, config unset.
+    {
+        let matches = <Opts as CommandFactory>::command().get_matches_from(SET_ARGS_Z);
+        let config: OptsConfig = serde_yaml::from_str(UNSET_CONFIG)?;
+        let opts = Opts::from_merged(matches, Some(config));
+        let expected = Opts {
+            cmd: Some(SubCommand::SubcommandC(SubcommandCOptions {
+                flag_c: FROM_DEFAULT_C.to_owned(),
+                subcommand_c_cmd: SubCommandCCmd::SubcommandZ,
+            })),
+        };
+        assert_eq!(expected, opts);
+    }
+
+    // Nested unit subcommand passed, config set.
+    {
+        let matches = <Opts as CommandFactory>::command().get_matches_from(SET_ARGS_Z);
+        let config: OptsConfig = serde_yaml::from_str(SET_CONFIG)?;
+        let opts = Opts::from_merged(matches, Some(config));
+        let expected = Opts {
+            cmd: Some(SubCommand::SubcommandC(SubcommandCOptions {
+                flag_c: FROM_CONFIG_C.to_owned(),
+                subcommand_c_cmd: SubCommandCCmd::SubcommandZ,
             })),
         };
         assert_eq!(expected, opts);
