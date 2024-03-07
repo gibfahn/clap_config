@@ -1,6 +1,7 @@
 //! Tests that the macro produces usable output for a complex clap derived struct (that doesn't
 //! include any subcommands).
 
+use clap::ArgAction;
 use clap::CommandFactory;
 use clap::Parser;
 use clap_config::ClapConfig;
@@ -11,6 +12,14 @@ use pretty_assertions::assert_eq;
 const FLAG_STRING_DEFAULT: &str = "flag-string-default";
 const FLAG_STRING_ARG: &str = "flag-string-arg";
 const FLAG_STRING_CONFIG: &str = "flag-string-config";
+
+const FLAG_BOOL_A_DEFAULT: bool = false;
+const FLAG_BOOL_A_ARG: bool = true;
+const FLAG_BOOL_A_CONFIG: bool = false;
+
+const FLAG_BOOL_B_DEFAULT: bool = false;
+const FLAG_BOOL_B_ARG: bool = false;
+const FLAG_BOOL_B_CONFIG: bool = true;
 
 const FLAG_OPTION_STRING_DEFAULT: Option<String> = None;
 const FLAG_OPTION_STRING_ARG: &str = "flag-option-string-arg";
@@ -31,10 +40,12 @@ const FLAG_VEC_MULTIPLE_CONFIG_C: &str = "flag-vec-multiple-config-c";
 const FLAG_VEC_MULTIPLE_CONFIG_D: &str = "flag-vec-multiple-config-d";
 
 const UNSET_ARGS: [&str; 1] = ["myapp"];
-const SET_ARGS: [&str; 13] = [
+const SET_ARGS: [&str; 15] = [
     "myapp",
     "--flag-string",
     FLAG_STRING_ARG,
+    "--flag-bool-a",
+    "--flag-bool-b=false",
     "--flag-option-string",
     FLAG_OPTION_STRING_ARG,
     "--flag-vec-single",
@@ -49,7 +60,10 @@ const SET_ARGS: [&str; 13] = [
 
 const UNSET_CONFIG: &str = "";
 const SET_CONFIG: &str = formatcp!(
-    "flag_string: {FLAG_STRING_CONFIG}
+    "---
+flag_string: {FLAG_STRING_CONFIG}
+flag_bool_a: {FLAG_BOOL_A_CONFIG}
+flag_bool_b: {FLAG_BOOL_B_CONFIG}
 flag_option_string: {FLAG_OPTION_STRING_CONFIG}
 flag_vec_single: [{FLAG_VEC_SINGLE_CONFIG}]
 flag_vec_multiple:
@@ -64,6 +78,18 @@ flag_vec_multiple:
 pub struct Opts {
     #[clap(long, default_value = FLAG_STRING_DEFAULT)]
     flag_string: String,
+    #[clap(long)]
+    flag_bool_a: bool,
+    #[clap(
+        long,
+        default_value_t = FLAG_BOOL_B_DEFAULT,
+        // If the user passes --flag-bool-b with no argument, set this to true.
+        default_missing_value = "true",
+        require_equals = true,
+        action = ArgAction::Set,
+        num_args(0..=1),
+    )]
+    flag_bool_b: bool,
     #[clap(long)]
     flag_option_string: Option<String>,
     #[clap(long)]
@@ -81,6 +107,8 @@ fn test_nothing_set() -> Result<()> {
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_DEFAULT.to_owned(),
+        flag_bool_a: FLAG_BOOL_A_DEFAULT,
+        flag_bool_b: FLAG_BOOL_B_DEFAULT,
         flag_option_string: FLAG_OPTION_STRING_DEFAULT,
         flag_vec_single: FLAG_VEC_SINGLE_DEFAULT,
         flag_vec_multiple: vec![
@@ -102,6 +130,8 @@ fn test_args_set() -> Result<()> {
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_ARG.to_owned(),
+        flag_bool_a: FLAG_BOOL_A_ARG,
+        flag_bool_b: FLAG_BOOL_B_ARG,
         flag_option_string: Some(FLAG_OPTION_STRING_ARG.to_owned()),
         flag_vec_single: vec![FLAG_VEC_SINGLE_ARG.to_owned()],
         flag_vec_multiple: vec![
@@ -124,6 +154,8 @@ fn test_config_set() -> Result<()> {
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_CONFIG.to_owned(),
+        flag_bool_a: FLAG_BOOL_A_CONFIG,
+        flag_bool_b: FLAG_BOOL_B_CONFIG,
         flag_option_string: Some(FLAG_OPTION_STRING_CONFIG.to_owned()),
         flag_vec_single: vec![FLAG_VEC_SINGLE_CONFIG.to_owned()],
         flag_vec_multiple: vec![
@@ -147,6 +179,8 @@ fn test_both_set() -> Result<()> {
 
     let expected_opts = Opts {
         flag_string: FLAG_STRING_ARG.to_owned(),
+        flag_bool_a: FLAG_BOOL_A_ARG,
+        flag_bool_b: FLAG_BOOL_B_ARG,
         flag_option_string: Some(FLAG_OPTION_STRING_ARG.to_owned()),
         flag_vec_single: vec![FLAG_VEC_SINGLE_ARG.to_owned()],
         flag_vec_multiple: vec![
