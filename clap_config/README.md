@@ -6,6 +6,32 @@ command-line argument and environment variable defaults.
 The goal is to be easy to use, and to leave all the clap configuration for clap to deal with,
 while removing boilerplate around creating the config struct and merging it with the clap one.
 
+## Usage
+
+```rust
+use clap::CommandFactory;
+use clap::Parser;
+use clap_config::ClapConfig;
+use std::fs;
+
+#[derive(ClapConfig, Parser, Debug)]
+pub struct Opts {
+    #[clap(long)]
+    flag: String,
+}
+
+// You can use any file format that implements Deserialize.
+let config_str = fs::read_to_string("/path/to/config.yaml").unwrap();
+
+// Build an ArgMatches so we can see where each value comes from.
+let matches = <Opts as CommandFactory>::command().get_matches();
+// Build an instance of the auto-generated <YourStruct>Config struct
+let config: OptsConfig = serde_yaml::from_str(&config_str).unwrap();
+
+// Merge the two together into your actual struct.
+let opts = Opts::from_merged(matches, config);
+```
+
 ## TODO
 
 - Support for setting serde flags like `#[serde(rename_all = "kebab-case",

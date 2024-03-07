@@ -121,27 +121,45 @@ fn generate_merge_method(
 
     let field_updates = fields.iter().map(|f| {
         let name = &f.ident;
-        let name_str = name.as_ref().map(|name| name.to_string());
-        let config_value = if strip_optional_wrapper_if_present(f).is_some() {
-            quote!{
-                Some(config_value)
+        let ty = &f.ty;
+        let span = ty.span();
+        let name_str = name.as_ref().map(|name| name.to_string()).expect("Expected field to have a name");
+
+        if let Some(ty_stripped) = strip_optional_wrapper_if_present(f) {
+            // User-specified type was an `Option<T>`
+            quote_spanned! {span=>
+                let #name: #ty = {
+                    let config_value: #ty = config.#name.take();
+                    if matches.contains_id(#name_str) {
+                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #ty_stripped = matches.remove_one(#name_str).expect("checked contains_id");
+                        if value_source == clap::parser::ValueSource::DefaultValue {
+                            Some(config_value.unwrap_or(matches_value))
+                        } else {
+                            Some(matches_value)
+                        }
+                    } else {
+                        config_value
+                    }
+                };
             }
         } else {
-            quote!{
-                config_value
+            quote_spanned! {span=>
+                let #name: #ty = {
+                    let config_value: std::option::Option<#ty> = config.#name.take();
+                    if matches.contains_id(#name_str) {
+                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #ty = matches.remove_one(#name_str).expect("checked contains_id");
+                        if value_source == clap::parser::ValueSource::DefaultValue {
+                            config_value.unwrap_or(matches_value)
+                        } else {
+                            matches_value
+                        }
+                    } else {
+                        config_value.expect("Value shouldn't be optional here")
+                    }
+                };
             }
-        };
-        quote! {
-            let #name = if let Some(config_value) = config.#name.take() {
-                if matches.contains_id(#name_str) &&
-                    matches.value_source(#name_str).expect("checked contains_id") == clap::parser::ValueSource::DefaultValue {
-                    #config_value
-                } else {
-                    matches.remove_one(#name_str).expect("checked contains_id")
-                }
-            } else {
-                matches.remove_one(#name_str).expect("checked contains_id")
-            };
         }
     });
 
