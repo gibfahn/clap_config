@@ -256,7 +256,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                             matches_value
                         }
                     } else {
-                        config_value.unwrap_or_default()
+                        config_value.expect("Required arg #name not provided in args or config.")
                     }
                 };
             }
