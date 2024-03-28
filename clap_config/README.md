@@ -1,7 +1,6 @@
 # Clap Config
 
-A crate to allow automatically merging defaults from a config file with clap-processed
-command-line argument and environment variable defaults.
+Automatically merge CLI args, environment variables, config files, and default values in clap apps.
 
 The goal is to be easy to use, and to leave all the clap configuration for clap to deal with,
 while removing boilerplate around creating the config struct and merging it with the clap one.
