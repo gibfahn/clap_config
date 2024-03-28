@@ -6,8 +6,7 @@ members = ["clap_config"]
 [workspace.package]
 license = "MIT OR Apache-2.0"
 
-# Don't allow publishing for now to prevent accidentally publishing to crates.io.
-publish = false
+publish = true
 
 keywords = ["argument", "cli", "arg", "parser", "parse"]
 categories = ["command-line-utilities"]
