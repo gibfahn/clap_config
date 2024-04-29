@@ -87,6 +87,8 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     }
 
     let output = quote!(
+        // We currently default everything to pub by default, so don't warn about it.
+        #[allow(private_interfaces)]
         #[derive(
             std::default::Default,
             std::fmt::Debug,
@@ -114,7 +116,7 @@ fn variants_to_fields(variants: &Punctuated<syn::Variant, Comma>) -> TokenStream
         // Skip unit subcommand fields (as they have no opts to configure).
         let f = get_variant_field(v)?;
         let ty = make_subcommand_ty(&f.ty);
-        Some(quote_spanned!(f.span()=> #name: std::option::Option<#ty>))
+        Some(quote_spanned!(f.span()=> pub #name: std::option::Option<#ty>))
     });
 
     quote! {
@@ -174,12 +176,12 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
             let ty = make_subcommand_ty(strip_optional_wrapper_if_present(f).unwrap_or(&f.ty));
             optional_fields.push(quote_spanned!(f.span()=>
                 #[serde(flatten)]
-                #name: std::option::Option<#ty>
+                pub #name: std::option::Option<#ty>
             ))
         } else if strip_optional_wrapper_if_present(f).is_some() {
-            optional_fields.push(quote_spanned!(f.span()=> #name: #ty))
+            optional_fields.push(quote_spanned!(f.span()=> pub #name: #ty))
         } else {
-            optional_fields.push(quote_spanned!(f.span()=> #name: std::option::Option<#ty>))
+            optional_fields.push(quote_spanned!(f.span()=> pub #name: std::option::Option<#ty>))
         }
     }
 
