@@ -33,6 +33,7 @@ let opts = Opts::from_merged(matches, Some(config));
 
 ## Todos
 
+- Handle `Box<SubcommandOpts>` wrapping.
 - Set serde flags like `#[serde(rename_all = "kebab-case", deny_unknown_fields)]` on the generated struct.
 - Set required arguments in the config file.
 - Set positional arguments in the config file
