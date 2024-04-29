@@ -120,7 +120,10 @@ fn variants_to_fields(variants: &Punctuated<syn::Variant, Comma>) -> TokenStream
     });
 
     quote! {
-        #(#optional_fields),*
+        #(
+            #[serde(skip_serializing_if = "Option::is_none")]
+            #optional_fields
+        ),*
     }
 }
 
@@ -186,7 +189,10 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
     }
 
     quote! {
-        #(#optional_fields),*
+        #(
+            #[serde(skip_serializing_if = "Option::is_none")]
+            #optional_fields
+        ),*
     }
 }
 
