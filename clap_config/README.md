@@ -36,3 +36,7 @@ let opts = Opts::from_merged(matches, Some(config));
 - Set serde flags like `#[serde(rename_all = "kebab-case", deny_unknown_fields)]` on the generated struct.
 - Set required arguments in the config file.
 - Set positional arguments in the config file
+- support clap aliases
+- Support `Box<SubCommandOpts>`
+- Support generating a config file spec with [schemars](https://docs.rs/schemars)
+- Copy docstring from parent struct.
