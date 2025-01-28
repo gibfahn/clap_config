@@ -1,3 +1,7 @@
+mod clap;
+
+use clap::attr::CLAP_SKIP_ATTR;
+use clap::attr::CLAP_SUBCOMMAND_ATTR;
 use heck::ToKebabCase;
 use heck::ToSnakeCase;
 use proc_macro2::TokenStream;
@@ -17,17 +21,14 @@ use syn::Field;
 use syn::Fields;
 use syn::GenericArgument;
 use syn::Ident;
-use syn::Meta;
 use syn::PathArguments;
 use syn::PathSegment;
-use syn::Token;
 use syn::Type;
 use syn::TypePath;
 use syn::TypeTuple;
 use syn::Variant;
 
 const CLAP_CONFIG_ATTR_NAME: &str = "clap_config";
-const CLAP_ATTR_NAME: &str = "clap";
 
 /**
 Generate a config struct and a method to merge the two values together.
@@ -175,7 +176,9 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
                 std::collections::BTreeMap<std::string::String, std::string::String>
             );
         }
-        if is_subcommand_field(f).expect("Failed to check if subcommand field is field") {
+        if clap::attr::has_field(f, CLAP_SUBCOMMAND_ATTR)
+            .expect("Failed to check if subcommand field is field")
+        {
             let ty = make_subcommand_ty(strip_optional_wrapper_if_present(f).unwrap_or(&f.ty));
             optional_fields.push(quote_spanned!(f.span()=>
                 #[serde(flatten)]
@@ -224,7 +227,6 @@ Generate method that merges our config into the clap-generated struct, with prec
 - Clap defaults
 */
 fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) -> TokenStream {
-    eprintln!("Struct merge fields: {}", quote!(#fields));
     let struct_fields = fields.iter().map(|f| {
         let name = &f.ident;
         quote!(#name)
@@ -248,11 +250,11 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             quote!(config.as_mut().and_then(|c| c.#name.take()))
         };
 
-        if is_clap_skipped(f).expect("Failed to check whether field is skipped in clap") {
+        if clap::attr::has_field(f, CLAP_SKIP_ATTR).expect("Failed to check whether field is skipped in clap") {
             quote_spanned! {span=>
                 let #name: #ty = config.as_ref().and_then(|c| c.#name.clone()).unwrap_or_default();
             }
-        } else if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
+        } else if clap::attr::has_field(f, CLAP_SUBCOMMAND_ATTR).expect("Failed to check if field is subcommand.") {
             if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
                 quote_spanned! {span=>
                     let #name: #ty = {
@@ -497,25 +499,6 @@ fn strip_vec_wrapper_if_present(f: &Field) -> Option<&Type> {
     None
 }
 
-// Returns whether the field has a field attribute `#[clap(subcommand)]`.
-fn is_subcommand_field(f: &Field) -> Result<bool, syn::Error> {
-    let mut is_subcommand = false;
-    'outer: for attr in f.attrs.iter() {
-        if attr.path().is_ident("clap") {
-            for meta in attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)? {
-                if let Meta::Path(path) = meta {
-                    if path.is_ident(&Ident::new("subcommand", path.span())) {
-                        is_subcommand = true;
-                        break 'outer;
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(is_subcommand)
-}
-
 /// Check whether the user has asked us to skip generating/checking the config for this field.
 fn is_field_marked_skipped(f: &Field) -> Result<bool, TokenStream> {
     for attr in f.attrs.iter() {
@@ -534,19 +517,6 @@ fn is_field_marked_skipped(f: &Field) -> Result<bool, TokenStream> {
                     .into_compile_error());
                 }
             }
-        }
-    }
-
-    Ok(false)
-}
-
-fn is_clap_skipped(f: &Field) -> Result<bool, TokenStream> {
-    for attr in f.attrs.iter() {
-        eprintln!("Attr: {}", quote!(#attr));
-        // This is a massive hack, but I'm not sure what the right way to actually parse clap
-        // contents is without being part of clap itself.
-        if attr.path().is_ident(CLAP_ATTR_NAME) && quote!(#attr).to_string().contains("skip") {
-            return Ok(true);
         }
     }
 

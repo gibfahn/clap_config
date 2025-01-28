@@ -15,6 +15,10 @@ pub struct Opts {
 
     #[clap(skip, value_parser(clap::value_parser!(String)))]
     config_only: HashMap<String, HashMap<String, bool>>,
+
+    #[clap_config(skip)]
+    #[clap(skip, value_parser(clap::value_parser!(String)))]
+    skipped_everywhere: HashMap<String, HashMap<String, bool>>,
 }
 
 #[test]
