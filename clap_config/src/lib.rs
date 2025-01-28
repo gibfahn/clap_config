@@ -1,6 +1,5 @@
 use heck::ToKebabCase;
 use heck::ToSnakeCase;
-// use clap::clap_derive::ClapAttr;
 use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
@@ -28,6 +27,7 @@ use syn::TypeTuple;
 use syn::Variant;
 
 const CLAP_CONFIG_ATTR_NAME: &str = "clap_config";
+const CLAP_ATTR_NAME: &str = "clap";
 
 /**
 Generate a config struct and a method to merge the two values together.
@@ -224,6 +224,7 @@ Generate method that merges our config into the clap-generated struct, with prec
 - Clap defaults
 */
 fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) -> TokenStream {
+    eprintln!("Struct merge fields: {}", quote!(#fields));
     let struct_fields = fields.iter().map(|f| {
         let name = &f.ident;
         quote!(#name)
@@ -247,7 +248,11 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             quote!(config.as_mut().and_then(|c| c.#name.take()))
         };
 
-        if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
+        if is_clap_skipped(f).expect("Failed to check whether field is skipped in clap") {
+            quote_spanned! {span=>
+                let #name: #ty = config.as_ref().and_then(|c| c.#name.clone()).unwrap_or_default();
+            }
+        } else if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
             if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
                 quote_spanned! {span=>
                     let #name: #ty = {
@@ -529,6 +534,19 @@ fn is_field_marked_skipped(f: &Field) -> Result<bool, TokenStream> {
                     .into_compile_error());
                 }
             }
+        }
+    }
+
+    Ok(false)
+}
+
+fn is_clap_skipped(f: &Field) -> Result<bool, TokenStream> {
+    for attr in f.attrs.iter() {
+        eprintln!("Attr: {}", quote!(#attr));
+        // This is a massive hack, but I'm not sure what the right way to actually parse clap
+        // contents is without being part of clap itself.
+        if attr.path().is_ident(CLAP_ATTR_NAME) && quote!(#attr).to_string().contains("skip") {
+            return Ok(true);
         }
     }
 
