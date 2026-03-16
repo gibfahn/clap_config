@@ -1,0 +1,104 @@
+#!/usr/bin/env zsh
+
+# Publish a new release.
+
+set -euo pipefail
+
+autoload -U colors && colors
+
+if [[ -n ${DEBUG:-} ]]; then
+  set -x
+fi
+
+project_dir=${0:a:h:h}
+cd $project_dir
+
+export RUSTFLAGS="-D warnings"
+
+main() {
+  echo "${fg[magenta]}Publishing new version of clap_config...${reset_color}" >&2
+
+  (( $+commands[gh] )) || brew install gh
+
+  if [[ $(git branch --show-current) != main ]]; then
+    error "Not currently on the main branch."
+  fi
+
+  # Bail on uncommitted diffs.
+  diff=$(git diff --color=always)
+  if [[ -n $diff ]]; then
+    error "Repo has uncommitted diffs:\n$diff"
+  fi
+
+  # Bail on untracked files.
+  untracked=$(git ls-files . --exclude-standard --others | head)
+  if [[ -n $untracked ]]; then
+    error "Repo has untracked files:\n$untracked"
+  fi
+
+  last_release=$(gh release list -L 1 --json tagName --jq '.[0].tagName')
+  cargo_toml_version=$(awk -F\" '/^version = /{print $2; exit}' clap_config/Cargo.toml)
+
+  # First argument is major, minor, or patch; else we prompt.
+  case ${1:-} in
+    major | minor | patch) new_version=$(bump_version $1 $cargo_toml_version) ;;
+    "")
+      default_new_release=$(bump_version patch $cargo_toml_version)
+      read "new_version?New version (current: ${cargo_toml_version}, default: ${default_new_release}): "
+      [[ -z $new_version ]] && new_version=$default_new_release
+      ;;
+    *) error "Unrecognized input: ${1}" ;;
+  esac
+
+  log_section "Bumping version from ${cargo_toml_version} to ${new_version}..."
+  gsed -i -E "0,/^version = \"${cargo_toml_version}\"\$/s//version = \"${new_version}\"/" clap_config/Cargo.toml
+  cargo check # Updates Cargo.lock.
+
+  log_section "Committing version bump..."
+  git add clap_config/Cargo.toml Cargo.lock
+  git commit -m "chore: bump version to ${new_version}"
+  git show --stat | cat
+
+  log_and_run cargo test
+
+  log_and_run git push origin main
+
+  latest_crate_version=$(curl -sf 'https://crates.io/api/v1/crates/clap_config' | jq -r .crate.newest_version)
+  if [[ $latest_crate_version == $new_version ]]; then
+    log_section "Skipping cargo publish, crates.io already has ${latest_crate_version}."
+  else
+    log_and_run cargo publish -p clap_config
+  fi
+
+  log_and_run gh release create "${new_version}" --target=main \
+    --generate-notes \
+    --notes-start-tag="${last_release}"
+
+  git fetch --all
+  log_section "Done. Released ${new_version}."
+}
+
+bump_version() {
+  case $1 in
+    major) awk -F '.' '{print $1+1 ".0.0"}' <<<$2 ;;
+    minor) awk -F '.' '{print $1 "." $2+1 ".0"}' <<<$2 ;;
+    patch) awk -F '.' '{print $1 "." $2 "." $3+1}' <<<$2 ;;
+    *) error "bump_version: unknown input ${1}" ;;
+  esac
+}
+
+log_section() {
+  echo "\n${fg[cyan]}=> $*${reset_color}" >&2
+}
+
+log_and_run() {
+  log_section "Running $*"
+  time "$@"
+}
+
+error() {
+  echo "${fg[red]}ERROR${reset_color}: $1" >&2
+  exit "${2:-1}"
+}
+
+main "$@"
