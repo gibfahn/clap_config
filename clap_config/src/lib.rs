@@ -5,10 +5,6 @@ use proc_macro2::TokenStream;
 use quote::format_ident;
 use quote::quote;
 use quote::quote_spanned;
-use syn::parse_macro_input;
-use syn::punctuated::Punctuated;
-use syn::spanned::Spanned;
-use syn::token::Comma;
 use syn::AngleBracketedGenericArguments;
 use syn::Data;
 use syn::DeriveInput;
@@ -26,6 +22,10 @@ use syn::Type;
 use syn::TypePath;
 use syn::TypeTuple;
 use syn::Variant;
+use syn::parse_macro_input;
+use syn::punctuated::Punctuated;
+use syn::spanned::Spanned;
+use syn::token::Comma;
 
 const CLAP_CONFIG_ATTR_NAME: &str = "clap_config";
 
@@ -244,7 +244,7 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
         let config_value_expr = if is_skipped {
             quote!(None)
         } else {
-            quote!(config.as_mut().and_then(|c| c.#name.take()))
+            quote!(__clap_config.as_mut().and_then(|c| c.#name.take()))
         };
 
         if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
@@ -252,11 +252,11 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                 quote_spanned! {span=>
                     let #name: #ty = {
                         if let Some((subcommand_name,
-                                     subcommand_matches)) = matches.remove_subcommand() {
+                                     subcommand_matches)) = __clap_matches.remove_subcommand() {
                             Some(#stripped_ty :: from_merged(
                                 subcommand_name,
                                 subcommand_matches,
-                                config.as_ref().and_then(|c| c.#name.clone())
+                                __clap_config.as_ref().and_then(|c| c.#name.clone())
                             ))
                         } else {
                             None
@@ -265,11 +265,11 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                 }
             } else {
                 quote_spanned! {span=>
-                    let (subcommand_name, subcommand_matches) = matches.remove_subcommand().expect("Subcommand is required, so expected it to be set.");
+                    let (subcommand_name, subcommand_matches) = __clap_matches.remove_subcommand().expect("Subcommand is required, so expected it to be set.");
                     let #name: #ty = #ty :: from_merged(
                         subcommand_name,
                         subcommand_matches,
-                        config.as_ref().and_then(|c| c.#name.clone())
+                        __clap_config.as_ref().and_then(|c| c.#name.clone())
                     );
                 }
             }
@@ -278,9 +278,9 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             quote_spanned! {span=>
                 let #name: #ty = {
                     let config_value: #ty = #config_value_expr;
-                    if matches.contains_id(#name_str) {
-                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
-                        let matches_value: #stripped_ty = matches.remove_one(#name_str).expect("checked contains_id");
+                    if __clap_matches.contains_id(#name_str) {
+                        let value_source = __clap_matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #stripped_ty = __clap_matches.remove_one(#name_str).expect("checked contains_id");
                         if value_source == clap::parser::ValueSource::DefaultValue {
                             Some(config_value.unwrap_or(matches_value))
                         } else {
@@ -295,9 +295,9 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             quote_spanned! {span=>
                 let #name: #ty = {
                     let config_value: std::option::Option<std::collections::BTreeMap<std::string::String, std::string::String>> = #config_value_expr;
-                    if matches.contains_id(#name_str) {
-                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
-                        let matches_value: #ty = matches.remove_many(#name_str).expect("checked contains_id").collect();
+                    if __clap_matches.contains_id(#name_str) {
+                        let value_source = __clap_matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #ty = __clap_matches.remove_many(#name_str).expect("checked contains_id").collect();
                         if value_source == clap::parser::ValueSource::DefaultValue {
                             config_value
                                 .map_or(matches_value, |m| m
@@ -321,9 +321,9 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             quote_spanned! {span=>
                 let #name: #ty = {
                     let config_value: std::option::Option<#ty> = #config_value_expr;
-                    if matches.contains_id(#name_str) {
-                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
-                        let matches_value: #ty = matches.remove_many(#name_str).expect("checked contains_id").collect();
+                    if __clap_matches.contains_id(#name_str) {
+                        let value_source = __clap_matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #ty = __clap_matches.remove_many(#name_str).expect("checked contains_id").collect();
                         if value_source == clap::parser::ValueSource::DefaultValue {
                             config_value.unwrap_or(matches_value)
                         } else {
@@ -338,9 +338,9 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             quote_spanned! {span=>
                 let #name: #ty = {
                     let config_value: std::option::Option<#ty> = #config_value_expr;
-                    if matches.contains_id(#name_str) {
-                        let value_source = matches.value_source(#name_str).expect("checked contains_id");
-                        let matches_value: #ty = matches.remove_one(#name_str).expect("checked contains_id");
+                    if __clap_matches.contains_id(#name_str) {
+                        let value_source = __clap_matches.value_source(#name_str).expect("checked contains_id");
+                        let matches_value: #ty = __clap_matches.remove_one(#name_str).expect("checked contains_id");
                         if value_source == clap::parser::ValueSource::DefaultValue {
                             config_value.unwrap_or(matches_value)
                         } else {
@@ -356,8 +356,8 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
 
     quote! {
         pub fn from_merged(
-            mut matches: clap::ArgMatches,
-            mut config: ::std::option::Option<#config_ident>
+            mut __clap_matches: clap::ArgMatches,
+            mut __clap_config: ::std::option::Option<#config_ident>
         ) -> Self {
 
             #(#field_updates)*
@@ -392,8 +392,8 @@ fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>
 
         quote! {
             #kebab_case_name => Self::#name(
-                #subcmd_opts_name::from_merged(matches,
-                    config.and_then(|c| c.#snake_case_ident))
+                #subcmd_opts_name::from_merged(__clap_matches,
+                    __clap_config.and_then(|c| c.#snake_case_ident))
             ),
         }
     });
@@ -401,8 +401,8 @@ fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>
     quote! {
         pub fn from_merged(
             subcommand_name: String,
-            mut matches: clap::ArgMatches,
-            mut config: ::std::option::Option<#config_ident>
+            mut __clap_matches: clap::ArgMatches,
+            mut __clap_config: ::std::option::Option<#config_ident>
         ) -> Self {
             match subcommand_name.as_str() {
                 #(#match_arms)*
