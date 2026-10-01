@@ -63,7 +63,8 @@ main() {
 
   log_and_run git push origin main
 
-  latest_crate_version=$(curl -sf 'https://crates.io/api/v1/crates/clap_config' | jq -r .crate.newest_version)
+  # crates.io rejects generic user agents (e.g. curl's default) with a 403.
+  latest_crate_version=$(curl -sSf -A 'clap_config release script (https://github.com/gibfahn/clap_config)' 'https://crates.io/api/v1/crates/clap_config' | jq -r .crate.newest_version)
   if [[ $latest_crate_version == $new_version ]]; then
     log_section "Skipping cargo publish, crates.io already has ${latest_crate_version}."
   else
