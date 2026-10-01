@@ -18,7 +18,7 @@ export RUSTFLAGS="-D warnings"
 main() {
   echo "${fg[magenta]}Publishing new version of clap_config...${reset_color}" >&2
 
-  (( $+commands[gh] )) || brew install gh
+  (($+commands[gh])) || brew install gh
 
   if [[ $(git branch --show-current) != main ]]; then
     error "Not currently on the main branch."
@@ -41,13 +41,13 @@ main() {
 
   # First argument is major, minor, or patch; else we prompt.
   case ${1:-} in
-    major | minor | patch) new_version=$(bump_version $1 $cargo_toml_version) ;;
-    "")
-      default_new_release=$(bump_version patch $cargo_toml_version)
-      read "new_version?New version (current: ${cargo_toml_version}, default: ${default_new_release}): "
-      [[ -z $new_version ]] && new_version=$default_new_release
-      ;;
-    *) error "Unrecognized input: ${1}" ;;
+  major | minor | patch) new_version=$(bump_version $1 $cargo_toml_version) ;;
+  "")
+    default_new_release=$(bump_version patch $cargo_toml_version)
+    read "new_version?New version (current: ${cargo_toml_version}, default: ${default_new_release}): "
+    [[ -z $new_version ]] && new_version=$default_new_release
+    ;;
+  *) error "Unrecognized input: ${1}" ;;
   esac
 
   log_section "Bumping version from ${cargo_toml_version} to ${new_version}..."
@@ -80,10 +80,10 @@ main() {
 
 bump_version() {
   case $1 in
-    major) awk -F '.' '{print $1+1 ".0.0"}' <<<$2 ;;
-    minor) awk -F '.' '{print $1 "." $2+1 ".0"}' <<<$2 ;;
-    patch) awk -F '.' '{print $1 "." $2 "." $3+1}' <<<$2 ;;
-    *) error "bump_version: unknown input ${1}" ;;
+  major) awk -F '.' '{print $1+1 ".0.0"}' <<<$2 ;;
+  minor) awk -F '.' '{print $1 "." $2+1 ".0"}' <<<$2 ;;
+  patch) awk -F '.' '{print $1 "." $2 "." $3+1}' <<<$2 ;;
+  *) error "bump_version: unknown input ${1}" ;;
   esac
 }
 
