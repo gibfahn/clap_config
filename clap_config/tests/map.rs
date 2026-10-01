@@ -9,8 +9,8 @@ Special-case pending resolution of one of these issues:
 use clap::CommandFactory;
 use clap::Parser;
 use clap_config::ClapConfig;
-use color_eyre::eyre::eyre;
 use color_eyre::Result;
+use color_eyre::eyre::eyre;
 use const_format::formatcp;
 use pretty_assertions::assert_eq;
 

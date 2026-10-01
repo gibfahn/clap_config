@@ -419,19 +419,14 @@ fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>
 /// If the field type is `Option<Foo>`, return `Some(Foo)`. Else return `None`.
 fn strip_optional_wrapper_if_present(f: &Field) -> Option<&Type> {
     let ty = &f.ty;
-    if let Type::Path(TypePath { path, .. }) = ty {
-        if let Some(PathSegment { ident, arguments }) = path.segments.last() {
-            if ident == &Ident::new("Option", f.span()) {
-                if let PathArguments::AngleBracketed(AngleBracketedGenericArguments {
-                    args, ..
-                }) = arguments
-                {
-                    if let Some(GenericArgument::Type(inner_type)) = args.first() {
-                        return Some(inner_type);
-                    }
-                }
-            }
-        }
+    if let Type::Path(TypePath { path, .. }) = ty
+        && let Some(PathSegment { ident, arguments }) = path.segments.last()
+        && ident == &Ident::new("Option", f.span())
+        && let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) =
+            arguments
+        && let Some(GenericArgument::Type(inner_type)) = args.first()
+    {
+        return Some(inner_type);
     }
     None
 }
@@ -447,25 +442,17 @@ fn is_vec_tuple_string(f: &Field) -> bool {
         false
     }
 
-    if let Type::Path(TypePath { path, .. }) = ty {
-        if let Some(PathSegment { ident, arguments }) = path.segments.last() {
-            if ident == &Ident::new("Vec", f.span()) {
-                if let PathArguments::AngleBracketed(AngleBracketedGenericArguments {
-                    args, ..
-                }) = arguments
-                {
-                    if let Some(GenericArgument::Type(Type::Tuple(TypeTuple { elems, .. }))) =
-                        args.first()
-                    {
-                        let string_ident = Ident::new("String", f.span());
-                        if path_is_ident(elems.first(), &string_ident)
-                            && path_is_ident(elems.last(), &string_ident)
-                        {
-                            return true;
-                        }
-                    }
-                }
-            }
+    if let Type::Path(TypePath { path, .. }) = ty
+        && let Some(PathSegment { ident, arguments }) = path.segments.last()
+        && ident == &Ident::new("Vec", f.span())
+        && let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) =
+            arguments
+        && let Some(GenericArgument::Type(Type::Tuple(TypeTuple { elems, .. }))) = args.first()
+    {
+        let string_ident = Ident::new("String", f.span());
+        if path_is_ident(elems.first(), &string_ident) && path_is_ident(elems.last(), &string_ident)
+        {
+            return true;
         }
     }
     false
@@ -475,19 +462,14 @@ fn is_vec_tuple_string(f: &Field) -> bool {
 fn strip_vec_wrapper_if_present(f: &Field) -> Option<&Type> {
     let ty = &f.ty;
 
-    if let Type::Path(TypePath { path, .. }) = ty {
-        if let Some(PathSegment { ident, arguments }) = path.segments.last() {
-            if ident == &Ident::new("Vec", f.span()) {
-                if let PathArguments::AngleBracketed(AngleBracketedGenericArguments {
-                    args, ..
-                }) = arguments
-                {
-                    if let Some(GenericArgument::Type(inner_type)) = args.first() {
-                        return Some(inner_type);
-                    }
-                }
-            }
-        }
+    if let Type::Path(TypePath { path, .. }) = ty
+        && let Some(PathSegment { ident, arguments }) = path.segments.last()
+        && ident == &Ident::new("Vec", f.span())
+        && let PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }) =
+            arguments
+        && let Some(GenericArgument::Type(inner_type)) = args.first()
+    {
+        return Some(inner_type);
     }
 
     None
@@ -499,11 +481,11 @@ fn is_subcommand_field(f: &Field) -> Result<bool, syn::Error> {
     'outer: for attr in f.attrs.iter() {
         if attr.path().is_ident("clap") {
             for meta in attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)? {
-                if let Meta::Path(path) = meta {
-                    if path.is_ident(&Ident::new("subcommand", path.span())) {
-                        is_subcommand = true;
-                        break 'outer;
-                    }
+                if let Meta::Path(path) = meta
+                    && path.is_ident(&Ident::new("subcommand", path.span()))
+                {
+                    is_subcommand = true;
+                    break 'outer;
                 }
             }
         }
