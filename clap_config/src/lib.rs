@@ -309,10 +309,10 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
                         }
                     } else {
                         config_value
-                            .map(|h|
+                            .map_or_default(|h|
                                 h.into_iter()
                                  .collect::<Vec<(std::string::String, std::string::String)>>()
-                            ).unwrap_or_default()
+                            )
                     }
                 };
             }
