@@ -16,11 +16,16 @@ jobs:
           - ubuntu-latest
         # TODO: fix Windows build and enable the action.
         # - windows-latest
+        toolchain:
+          - stable
+          - nightly
       fail-fast: false
     steps:
       - uses: actions/checkout@v6
-      #      - uses: dtolnay/rust-toolchain@stable
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ matrix.toolchain }}
           components: clippy, rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features
       - run: cargo test --verbose --no-fail-fast
