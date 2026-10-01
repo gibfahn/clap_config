@@ -2,7 +2,7 @@
 
 [package]
 name = "clap_config"
-version = "0.1.2"
+version = "0.1.3"
 description = "Automatically merge CLI args, environment variables, config files, and default values in clap apps."
 
 license.workspace = true
