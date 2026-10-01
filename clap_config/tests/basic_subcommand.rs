@@ -4,8 +4,8 @@
 use clap::CommandFactory;
 use clap::Parser;
 use clap_config::ClapConfig;
-use color_eyre::eyre::bail;
 use color_eyre::Result;
+use color_eyre::eyre::bail;
 
 const FROM_DEFAULT: &str = "from-default";
 const FROM_ARG: &str = "from-arg";

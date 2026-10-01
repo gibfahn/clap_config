@@ -204,6 +204,7 @@ fn make_subcommand_ty(ty: &Type) -> Type {
             .expect("Expected subcommand type to be bare identifier.");
         let new_ident = get_config_ident(ident);
         Type::Path(TypePath {
+            attrs: Vec::new(),
             qself: None,
             path: syn::Path::from(PathSegment::from(new_ident)),
         })

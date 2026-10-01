@@ -20,14 +20,14 @@ exclude = ["tests/"]
 proc-macro = true
 
 [dependencies]
-proc-macro2 = "1.0.106"
-quote = "1.0.45"
-syn = { version = "2.0.117", features = [
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+syn = { version = "3.0.6", features = [
   "full",
   # "extra-traits", # Uncomment to debug syn.
 ] }
-serde = { version = "1.0.228", features = ["derive"] }
-clap = { version = "4.6.0", features = [
+serde = { version = "1.0.229", features = ["derive"] }
+clap = { version = "4.6.7", features = [
   "derive",
   "env",
   "string",
@@ -37,9 +37,9 @@ heck = "0.5.0"
 
 [dev-dependencies]
 color-eyre = "0.6.5"
-serde_json = "1.0.149"
+serde_json = "1.0.151"
 serde_yaml = "0.9.34"
 pretty_assertions = "1.4.1"
-const_format = "0.2.35"
-bytesize = { version = "2.3.1", features = ["serde"] }
+const_format = "0.2.36"
+bytesize = { version = "2.7.0", features = ["serde"] }
 camino = { version = "1", features = ["serde1"] }
