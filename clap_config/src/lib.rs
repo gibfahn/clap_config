@@ -67,6 +67,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let config_fields;
     let merge_method;
+    let config_merge_method;
 
     let data = &input.data;
     match *data {
@@ -75,6 +76,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 let input_fields = &fields.named;
                 config_fields = make_fields_optional(input_fields);
                 merge_method = struct_merge_method(config_ident, input_fields);
+                config_merge_method = struct_config_merge_method(input_fields);
             }
             _ => unimplemented!("Unimplemented struct field"),
         },
@@ -82,6 +84,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let variants = &data.variants;
             config_fields = variants_to_fields(variants);
             merge_method = enum_merge_method(config_ident, variants);
+            config_merge_method = enum_config_merge_method(variants);
         }
         _ => unimplemented!("Unimplemented input type"),
     }
@@ -102,6 +105,10 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
         impl #input_ident {
             #merge_method
+        }
+
+        impl #config_ident {
+            #config_merge_method
         }
     );
     proc_macro::TokenStream::from(output)
@@ -170,7 +177,12 @@ fn make_fields_optional(fields: &Punctuated<Field, Comma>) -> TokenStream {
             Err(e) => return quote!(#e),
         }
 
-        if is_vec_tuple_string(f) {
+        let is_config_only = match clap_skip_default(f) {
+            Ok(skip) => skip.is_some(),
+            Err(e) => return e.into_compile_error(),
+        };
+
+        if !is_config_only && is_vec_tuple_string(f) {
             ty = quote!(
                 std::collections::BTreeMap<std::string::String, std::string::String>
             );
@@ -248,7 +260,35 @@ fn struct_merge_method(config_ident: &Ident, fields: &Punctuated<Field, Comma>) 
             quote!(__clap_config.as_mut().and_then(|c| c.#name.take()))
         };
 
-        if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
+        let clap_skip = match clap_skip_default(f) {
+            Ok(skip) => skip,
+            Err(e) => return e.into_compile_error(),
+        };
+
+        if let Some(skip_default) = clap_skip {
+            // Field isn't a clap arg (`#[clap(skip)]`), so it can only be set in the config.
+            let default_expr = skip_default
+                .map_or_else(|| quote!(::std::default::Default::default()), |e| quote!(#e));
+            if strip_optional_wrapper_if_present(f).is_some() {
+                quote_spanned! {span=>
+                    let #name: #ty = {
+                        let config_value: #ty = #config_value_expr;
+                        if config_value.is_some() {
+                            config_value
+                        } else {
+                            #default_expr
+                        }
+                    };
+                }
+            } else {
+                quote_spanned! {span=>
+                    let #name: #ty = {
+                        let config_value: std::option::Option<#ty> = #config_value_expr;
+                        config_value.unwrap_or_else(|| #default_expr)
+                    };
+                }
+            }
+        } else if is_subcommand_field(f).expect("Failed to check if field is subcommand.") {
             if let Some(stripped_ty) = strip_optional_wrapper_if_present(f) {
                 quote_spanned! {span=>
                     let #name: #ty = {
@@ -411,6 +451,96 @@ fn enum_merge_method(config_ident: &Ident, variants: &Punctuated<Variant, Comma>
             }
         }
     }
+}
+
+/// Generate a method on the config struct that merges two configs field by field.
+fn struct_config_merge_method(fields: &Punctuated<Field, Comma>) -> TokenStream {
+    let field_merges = fields.iter().filter_map(|f| {
+        let name = &f.ident;
+        match is_field_marked_skipped(f) {
+            Ok(true) => return None,
+            Ok(false) => (),
+            Err(e) => return Some(e),
+        }
+        let is_subcommand = match is_subcommand_field(f) {
+            Ok(b) => b,
+            Err(e) => return Some(e.into_compile_error()),
+        };
+        Some(if is_subcommand {
+            nested_config_merge(f.span(), name)
+        } else {
+            quote_spanned!(f.span()=> #name: self.#name.or(fallback.#name),)
+        })
+    });
+
+    config_merge_method_tokens(quote!(Self { #(#field_merges)* }))
+}
+
+/// Generate a method on the subcommand config struct that merges two configs variant by variant.
+fn enum_config_merge_method(variants: &Punctuated<Variant, Comma>) -> TokenStream {
+    let variant_merges = variants.iter().filter_map(|v| {
+        get_variant_field(v)?;
+        let name = Ident::new(
+            &v.ident.to_string().as_str().to_snake_case(),
+            v.ident.span(),
+        );
+        Some(nested_config_merge(v.span(), &Some(name)))
+    });
+
+    config_merge_method_tokens(quote!(Self { #(#variant_merges)* }))
+}
+
+/// Wrap the struct expression built by the merge method generators in the `merge` method.
+fn config_merge_method_tokens(merged: TokenStream) -> TokenStream {
+    quote! {
+        /**
+        Merge two configs, preferring values set in `self` and falling back to values set in
+        `fallback`.
+
+        Subcommand configs are merged recursively. All other values (including `Vec`s and maps) are
+        taken from `self` if set, otherwise from `fallback`, they are not combined.
+
+        This is useful for layering configs, e.g. a more specific config over a general one, before
+        passing the result to `from_merged()`.
+        */
+        #[must_use]
+        pub fn merge(self, fallback: Self) -> Self {
+            #merged
+        }
+    }
+}
+
+/// Generate a field initializer that recursively merges an optional nested (subcommand) config.
+fn nested_config_merge(span: proc_macro2::Span, name: &Option<Ident>) -> TokenStream {
+    quote_spanned! {span=>
+        #name: match (self.#name, fallback.#name) {
+            (Some(preferred), Some(fallback)) => Some(preferred.merge(fallback)),
+            (preferred, fallback) => preferred.or(fallback),
+        },
+    }
+}
+
+/**
+Returns `Ok(Some(default))` if the field has a `#[clap(skip)]` or `#[arg(skip)]` attribute (where
+`default` is the expression passed as `skip = <expr>`, if any), else `Ok(None)`.
+
+These fields aren't clap args, so can only be set in the config file.
+*/
+fn clap_skip_default(f: &Field) -> Result<Option<Option<Expr>>, syn::Error> {
+    for attr in f.attrs.iter() {
+        if attr.path().is_ident("clap") || attr.path().is_ident("arg") {
+            for meta in attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)? {
+                match meta {
+                    Meta::Path(path) if path.is_ident("skip") => return Ok(Some(None)),
+                    Meta::NameValue(name_value) if name_value.path.is_ident("skip") => {
+                        return Ok(Some(Some(name_value.value)));
+                    }
+                    _ => (),
+                }
+            }
+        }
+    }
+    Ok(None)
 }
 
 // TODO(gib): steal from

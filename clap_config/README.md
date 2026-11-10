@@ -31,6 +31,42 @@ let config: OptsConfig = serde_yaml::from_str(&config_str).unwrap();
 let opts = Opts::from_merged(matches, Some(config));
 ```
 
+### Config-only fields
+
+Fields marked `#[clap(skip)]` (or `#[arg(skip)]`) aren't CLI args, so they can only be set in the
+config file. If they aren't set there, they use the `skip = <expr>` value if provided, otherwise
+`Default::default()`. Add `#[clap_config(skip)]` as well to leave them out of the config entirely.
+
+### Layering configs
+
+The generated config struct has a `merge()` method, which takes values from `self` and falls back to
+values from another config. Subcommand configs are merged recursively; all other values (including
+`Vec`s and maps) are replaced rather than combined. Use this to layer a more specific config over a
+general one before merging with the CLI args:
+
+```rust,ignore
+// CLI args > specific config > general config > clap defaults.
+let opts = Opts::from_merged(matches, Some(specific_config.merge(general_config)));
+```
+
+### Config-only fields
+
+Fields marked `#[clap(skip)]` (or `#[arg(skip)]`) aren't CLI args, so they can only be set in the
+config file. If they aren't set there, they use the `skip = <expr>` value if provided, otherwise
+`Default::default()`. Add `#[clap_config(skip)]` as well to leave them out of the config entirely.
+
+### Layering configs
+
+The generated config struct has a `merge()` method, which takes values from `self` and falls back to
+values from another config. Subcommand configs are merged recursively; all other values (including
+`Vec`s and maps) are replaced rather than combined. Use this to layer a more specific config over a
+general one before merging with the CLI args:
+
+```rust,ignore
+// CLI args > specific config > general config > clap defaults.
+let opts = Opts::from_merged(matches, Some(specific_config.merge(general_config)));
+```
+
 ## Todos
 
 - Set serde flags like `#[serde(rename_all = "kebab-case", deny_unknown_fields)]` on the generated struct.
